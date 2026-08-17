@@ -30,8 +30,22 @@ def test_sms():
     twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
     test_number = os.environ.get("TEST_PHONE_NUMBER")
 
-    if not all([account_sid, auth_token, twilio_number, test_number]):
-        return "Missing Twilio settings", 500
+   missing = []
+
+if not account_sid:
+    missing.append("TWILIO_ACCOUNT_SID")
+
+if not auth_token:
+    missing.append("TWILIO_AUTH_TOKEN")
+
+if not twilio_number:
+    missing.append("TWILIO_PHONE_NUMBER")
+
+if not test_number:
+    missing.append("TEST_PHONE_NUMBER")
+
+if missing:
+    return "Missing: " + ", ".join(missing), 500
 
     client = Client(account_sid, auth_token)
 
