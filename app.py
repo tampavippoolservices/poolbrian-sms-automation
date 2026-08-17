@@ -48,12 +48,21 @@ def init_db():
 def job_already_processed(record_id):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM processed_jobs WHERE record_id = %s",
-                (record_id,)
-            )
+            cur.execute("""
+                SELECT status
+                FROM processed_jobs
+                WHERE record_id = %s
+            """, (record_id,))
 
-            return cur.fetchone() is not None
+            row = cur.fetchone()
+
+            if not row:
+                return False
+
+            return row[0] in (
+                "baseline",
+                "text_sent"
+            )
 
 
 def save_processed_job(
@@ -72,7 +81,12 @@ def save_processed_job(
                     twilio_message_sid
                 )
                 VALUES (%s, %s, %s, %s)
-                ON CONFLICT (record_id) DO NOTHING
+                ON CONFLICT (record_id)
+                DO UPDATE SET
+                    customer_id = EXCLUDED.customer_id,
+                    status = EXCLUDED.status,
+                    twilio_message_sid = EXCLUDED.twilio_message_sid,
+                    processed_at = NOW()
             """, (
                 record_id,
                 customer_id,
