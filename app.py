@@ -237,11 +237,12 @@ def poolbrain_webhook():
 
 @app.route("/process-completed-services", methods=["GET"])
 def process_completed_services():
-        provided_secret = request.args.get("secret")
+    provided_secret = request.args.get("secret")
     expected_secret = os.environ.get("PROCESS_SECRET")
 
     if not expected_secret or provided_secret != expected_secret:
         return "Unauthorized", 401
+
     init_db()
 
     completed_jobs = get_completed_jobs_today()
