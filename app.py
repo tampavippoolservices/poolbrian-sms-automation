@@ -4,12 +4,110 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import psycopg
 import json
 import os
 
 app = Flask(__name__)
 
 POOLBRAIN_BASE_URL = "https://prodapi.poolbrain.com"
+
+
+def get_db_connection():
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise Exception("DATABASE_URL is missing")
+
+    return psycopg.connect(database_url)
+
+
+def init_db():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS processed_jobs (
+                    record_id BIGINT PRIMARY KEY,
+                    customer_id BIGINT,
+                    status TEXT NOT NULL,
+                    processed_at TIMESTAMPTZ DEFAULT NOW(),
+                    twilio_message_sid TEXT
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS automation_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+
+        conn.commit()
+
+
+def job_already_processed(record_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM processed_jobs WHERE record_id = %s",
+                (record_id,)
+            )
+
+            return cur.fetchone() is not None
+
+
+def save_processed_job(
+    record_id,
+    customer_id,
+    status,
+    twilio_message_sid=None
+):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO processed_jobs (
+                    record_id,
+                    customer_id,
+                    status,
+                    twilio_message_sid
+                )
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (record_id) DO NOTHING
+            """, (
+                record_id,
+                customer_id,
+                status,
+                twilio_message_sid
+            ))
+
+        conn.commit()
+
+
+def baseline_is_complete():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT value
+                FROM automation_state
+                WHERE key = 'completed_service_baseline'
+            """)
+
+            row = cur.fetchone()
+
+            return row is not None and row[0] == "complete"
+
+
+def mark_baseline_complete():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO automation_state (key, value)
+                VALUES ('completed_service_baseline', 'complete')
+                ON CONFLICT (key)
+                DO UPDATE SET value = EXCLUDED.value
+            """)
+
+        conn.commit()
 
 
 def send_sms(to_number, message_body):
@@ -48,7 +146,9 @@ def poolbrain_get(endpoint, params=None):
     )
 
     with urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+        return json.loads(
+            response.read().decode("utf-8")
+        )
 
 
 def get_customer(customer_id):
@@ -72,10 +172,35 @@ def get_customer(customer_id):
             return customers
 
         for value in customers.values():
-            if isinstance(value, dict) and "CustomerName" in value:
+            if (
+                isinstance(value, dict)
+                and "CustomerName" in value
+            ):
                 return value
 
     return None
+
+
+def get_completed_jobs_today():
+    today = datetime.now(
+        ZoneInfo("America/New_York")
+    ).strftime("%Y-%m-%d")
+
+    result = poolbrain_get(
+        "/v2/route_stops_job_list",
+        {
+            "fromDate": today,
+            "toDate": today
+        }
+    )
+
+    jobs = result.get("data", [])
+
+    return [
+        job
+        for job in jobs
+        if job.get("JobStatus") == "Completed"
+    ]
 
 
 @app.route("/", methods=["GET"])
@@ -90,100 +215,132 @@ def poolbrain_webhook():
     print("PoolBrain webhook received:")
     print(data)
 
-    event = data.get("event")
-
-    if event == "customer.created":
-        test_number = os.environ.get("TEST_PHONE_NUMBER")
-
-        if test_number:
-            sid = send_sms(
-                test_number,
-                "PoolBrain test successful! A customer-created webhook triggered this SMS automatically."
-            )
-
-            print("Automatic test SMS sent:")
-            print(sid)
-
     return jsonify({
         "success": True,
         "message": "Webhook received"
     }), 200
 
 
+@app.route("/process-completed-services", methods=["GET"])
+def process_completed_services():
+    init_db()
+
+    completed_jobs = get_completed_jobs_today()
+
+    if not baseline_is_complete():
+        count = 0
+
+        for job in completed_jobs:
+            record_id = job.get("RecordID")
+            customer_id = job.get("CustomerId")
+
+            if not record_id:
+                continue
+
+            save_processed_job(
+                record_id,
+                customer_id,
+                "baseline"
+            )
+
+            count += 1
+
+        mark_baseline_complete()
+
+        return (
+            f"Baseline complete. "
+            f"{count} existing completed jobs were remembered. "
+            f"No customer texts were sent."
+        )
+
+    sent_count = 0
+    skipped_count = 0
+
+    for job in completed_jobs:
+        record_id = job.get("RecordID")
+        customer_id = job.get("CustomerId")
+
+        if not record_id or not customer_id:
+            continue
+
+        if job_already_processed(record_id):
+            skipped_count += 1
+            continue
+
+        customer = get_customer(customer_id)
+
+        if not customer:
+            save_processed_job(
+                record_id,
+                customer_id,
+                "customer_not_found"
+            )
+            continue
+
+        customer_name = customer.get(
+            "CustomerName",
+            "Customer"
+        )
+
+        customer_phone = customer.get("Phone")
+
+        if not customer_phone:
+            save_processed_job(
+                record_id,
+                customer_id,
+                "no_phone"
+            )
+            continue
+
+        message_body = (
+            f"Hi {customer_name}, your pool service "
+            f"has been completed today. Thank you!"
+        )
+
+        sid = send_sms(
+            customer_phone,
+            message_body
+        )
+
+        save_processed_job(
+            record_id,
+            customer_id,
+            "text_sent",
+            sid
+        )
+
+        sent_count += 1
+
+    return (
+        f"Processing complete. "
+        f"{sent_count} new service texts sent. "
+        f"{skipped_count} jobs were already processed."
+    )
+
+
 @app.route("/test-sms", methods=["GET"])
 def test_sms():
-    test_number = os.environ.get("TEST_PHONE_NUMBER")
+    test_number = os.environ.get(
+        "TEST_PHONE_NUMBER"
+    )
 
     sid = send_sms(
         test_number,
-        "Test successful! PoolBrain SMS Automation is connected to Twilio."
+        "Test successful! PoolBrain SMS Automation "
+        "is connected to Twilio."
     )
 
     return f"SMS sent! Message ID: {sid}"
 
 
-@app.route("/test-completed-service", methods=["GET"])
-def test_completed_service():
-    test_number = os.environ.get("TEST_PHONE_NUMBER")
-
-    if not test_number:
-        return "TEST_PHONE_NUMBER is missing", 500
-
-    today = datetime.now(
-        ZoneInfo("America/New_York")
-    ).strftime("%Y-%m-%d")
-
-    jobs_result = poolbrain_get(
-        "/v2/route_stops_job_list",
-        {
-            "fromDate": today,
-            "toDate": today
-        }
-    )
-
-    jobs = jobs_result.get("data", [])
-
-    completed_jobs = [
-        job for job in jobs
-        if job.get("JobStatus") == "Completed"
-    ]
-
-    if not completed_jobs:
-        return f"No completed PoolBrain jobs found for {today}."
-
-    job = completed_jobs[0]
-
-    customer_id = job.get("CustomerId")
-
-    if not customer_id:
-        return "Completed job does not contain CustomerId.", 500
-
-    customer = get_customer(customer_id)
-
-    if not customer:
-        return "Customer could not be found in PoolBrain.", 500
-
-    customer_name = customer.get("CustomerName", "Customer")
-    customer_phone = customer.get("Phone")
-
-    if not customer_phone:
-        return "Customer was found, but no phone number is stored.", 500
-
-    message_body = (
-        f"TEST MODE: PoolBrain found a completed service for "
-        f"{customer_name}. In production, the service-completed "
-        f"SMS would now be sent to this customer."
-    )
-
-    sid = send_sms(test_number, message_body)
-
-    return (
-        f"Success! Completed service found. "
-        f"Customer lookup worked. Test SMS sent to your test phone. "
-        f"Message ID: {sid}"
-    )
-
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    init_db()
+
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
