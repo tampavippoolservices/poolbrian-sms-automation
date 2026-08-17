@@ -67,9 +67,13 @@ def get_customer(customer_id):
     if isinstance(customers, list):
         return customers[0]
 
-    if isinstance(customers, dict):
-        first_customer = next(iter(customers.values()), None)
-        return first_customer
+ if isinstance(customers, dict):
+    if "CustomerName" in customers:
+        return customers
+
+    for value in customers.values():
+        if isinstance(value, dict) and "CustomerName" in value:
+            return value
 
     return None
 
