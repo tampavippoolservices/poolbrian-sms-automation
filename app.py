@@ -55,7 +55,7 @@ def get_customer(customer_id):
     result = poolbrain_get(
         "/v2/customer_detail",
         {
-            "customerId": customer_id
+            "customerId": str(customer_id)
         }
     )
 
@@ -64,7 +64,14 @@ def get_customer(customer_id):
     if not customers:
         return None
 
-    return customers[0]
+    if isinstance(customers, list):
+        return customers[0]
+
+    if isinstance(customers, dict):
+        first_customer = next(iter(customers.values()), None)
+        return first_customer
+
+    return None
 
 
 @app.route("/", methods=["GET"])
