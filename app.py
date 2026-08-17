@@ -67,13 +67,13 @@ def get_customer(customer_id):
     if isinstance(customers, list):
         return customers[0]
 
- if isinstance(customers, dict):
-    if "CustomerName" in customers:
-        return customers
+    if isinstance(customers, dict):
+        if "CustomerName" in customers:
+            return customers
 
-    for value in customers.values():
-        if isinstance(value, dict) and "CustomerName" in value:
-            return value
+        for value in customers.values():
+            if isinstance(value, dict) and "CustomerName" in value:
+                return value
 
     return None
 
