@@ -243,6 +243,12 @@ def process_completed_services():
     if not expected_secret or provided_secret != expected_secret:
         return "Unauthorized", 401
 
+        now = datetime.now(ZoneInfo("America/New_York"))
+    current_hour = now.hour
+
+    if current_hour < 6 or current_hour >= 19:
+        return "Outside allowed processing hours.", 200
+
     init_db()
 
     completed_jobs = get_completed_jobs_today()
