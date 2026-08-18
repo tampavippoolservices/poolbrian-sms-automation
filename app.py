@@ -241,7 +241,7 @@ def process_completed_services():
     expected_secret = os.environ.get("PROCESS_SECRET")
 
     if not expected_secret or provided_secret != expected_secret:
-    return "Unauthorized", 401
+        return "Unauthorized", 401
 
     now = datetime.now(ZoneInfo("America/New_York"))
     current_hour = now.hour
