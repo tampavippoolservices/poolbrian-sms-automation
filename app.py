@@ -484,11 +484,11 @@ def dashboard():
                     message_status,
                     destination_number,
                     error_code,
+                    message_type,
                     updated_at
                 FROM sms_delivery_status
                 ORDER BY updated_at DESC
                 LIMIT 20
-            """)
             recent_rows = cur.fetchall()
             recent_rows = [
                 (
@@ -496,7 +496,7 @@ def dashboard():
                     row[1],
                     row[2],
                     row[3],
-                    row[4]
+                    row[5]
                     .astimezone(ZoneInfo("America/New_York"))
                     .strftime("%Y-%m-%d %I:%M:%S %p")
                 )
