@@ -36,6 +36,18 @@ def init_db():
             """)
 
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS processed_alerts (
+                alert_id BIGINT PRIMARY KEY,
+                customer_id BIGINT,
+                job_id BIGINT,
+                alert_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                processed_at TIMESTAMPTZ DEFAULT NOW(),
+                twilio_message_sid TEXT
+             )
+         """)
+            
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS automation_state (
                     key TEXT PRIMARY KEY,
                     value TEXT
@@ -44,6 +56,59 @@ def init_db():
 
         conn.commit()
 
+
+def alert_already_processed(alert_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT status
+                FROM processed_alerts
+                WHERE alert_id = %s
+            """, (alert_id,))
+
+            row = cur.fetchone()
+
+            return row is not None
+
+
+def save_processed_alert(
+    alert_id,
+    customer_id,
+    job_id,
+    alert_type,
+    status,
+    twilio_message_sid=None
+):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO processed_alerts (
+                    alert_id,
+                    customer_id,
+                    job_id,
+                    alert_type,
+                    status,
+                    twilio_message_sid
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (alert_id)
+                DO UPDATE SET
+                    customer_id = EXCLUDED.customer_id,
+                    job_id = EXCLUDED.job_id,
+                    alert_type = EXCLUDED.alert_type,
+                    status = EXCLUDED.status,
+                    twilio_message_sid = EXCLUDED.twilio_message_sid,
+                    processed_at = NOW()
+            """, (
+                alert_id,
+                customer_id,
+                job_id,
+                alert_type,
+                status,
+                twilio_message_sid
+            ))
+
+        conn.commit()
 
 def job_already_processed(record_id):
     with get_db_connection() as conn:
@@ -255,10 +320,61 @@ def poolbrain_webhook():
                     alert_text = alert_name.lower()
 
                     if alert_name == "WaterLevelLow":
-                        print("WATER LEVEL LOW DETECTED")
-                        print(f"CustomerId: {customer_id}")
-                        print(f"JobID: {job_id}")
-                        print(f"AlertId: {alert.get('alertId')}")
+    alert_id = alert.get("alertId")
+
+    print("WATER LEVEL LOW DETECTED")
+    print(f"CustomerId: {customer_id}")
+    print(f"JobID: {job_id}")
+    print(f"AlertId: {alert_id}")
+
+    init_db()
+
+    if alert_already_processed(alert_id):
+        print(f"Water Level Low alert {alert_id} already processed")
+        continue
+
+    customer = get_customer(customer_id)
+
+    if not customer:
+        print(f"Customer {customer_id} not found")
+        continue
+
+    customer_name = customer.get(
+        "CustomerName",
+        "Customer"
+    )
+
+    customer_phone = customer.get("Phone")
+
+    if not customer_phone:
+        print(f"No phone number for customer {customer_id}")
+        continue
+
+    message_body = (
+        f"Hi {customer_name}, your pool technician noticed that "
+        f"your pool water level is low. Please add water to the "
+        f"normal operating level when convenient. "
+        f"Tampa VIP Pool Services"
+    )
+
+    sid = send_sms(
+        customer_phone,
+        message_body
+    )
+
+    save_processed_alert(
+        alert_id,
+        customer_id,
+        job_id,
+        "WaterLevelLow",
+        "text_sent",
+        sid
+    )
+
+    print(
+        f"Water Level Low SMS sent to {customer_name}. "
+        f"Twilio SID: {sid}"
+    )
 
     return jsonify({
         "success": True,
