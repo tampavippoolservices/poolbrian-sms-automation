@@ -241,9 +241,9 @@ def poolbrain_webhook():
             alert_categories = job.get("AlertCategories", [])
 
             for category in alert_categories:
-                custom_alerts = category.get("CustomAlert", [])
+                issue_reports = category.get("IssueReport", [])
 
-                for alert in custom_alerts:
+                for alert in issue_reports:
                     alert_name = (
                         alert.get("AlertName")
                         or alert.get("type")
@@ -254,11 +254,7 @@ def poolbrain_webhook():
 
                     alert_text = alert_name.lower()
 
-                    if (
-                        "water" in alert_text
-                        and "level" in alert_text
-                        and "low" in alert_text
-                    ):
+                    if alert_name == "WaterLevelLow":
                         print("WATER LEVEL LOW DETECTED")
                         print(f"CustomerId: {customer_id}")
                         print(f"JobID: {job_id}")
