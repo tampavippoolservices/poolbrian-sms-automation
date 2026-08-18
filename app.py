@@ -497,6 +497,7 @@ def dashboard():
                     row[1],
                     row[2],
                     row[3],
+                    row[4],
                     row[5]
                     .astimezone(ZoneInfo("America/New_York"))
                     .strftime("%Y-%m-%d %I:%M:%S %p")
@@ -572,17 +573,20 @@ def dashboard():
             <table>
                 <tr>
                     <th>Status</th>
-                    <th>Phone</th>
-                    <th>Error</th>
-                    <th>Updated</th>
+                        <th>Status</th>
+                        <th>Phone</th>
+                        <th>Type</th>
+                        <th>Error</th>
+                        <th>Updated</th>
                 </tr>
 
                 {% for row in recent_rows %}
                 <tr>
                     <td>{{ row[1] }}</td>
                     <td>{{ row[2] or "Not recorded" }}</td>
+                    <td>{{ row[4] or "general" }}</td>
                     <td>{{ row[3] or "" }}</td>
-                    <td>{{ row[4] }}</td>
+                    <td>{{ row[5] }}</td>
                 </tr>
                 {% endfor %}
             </table>
