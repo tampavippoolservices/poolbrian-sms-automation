@@ -551,6 +551,28 @@ def dashboard():
                 )
                 for row in recent_rows
             ]
+             cur.execute("""
+                SELECT
+                    from_number,
+                    message_body,
+                    received_at
+                FROM inbound_sms
+                ORDER BY received_at DESC
+                LIMIT 20
+            """)
+
+            inbound_rows = cur.fetchall()
+
+            inbound_rows = [
+                (
+                    row[0],
+                    row[1],
+                    row[2]
+                    .astimezone(ZoneInfo("America/New_York"))
+                    .strftime("%Y-%m-%d %I:%M:%S %p")
+                )
+                for row in inbound_rows
+            ]
 
     return render_template_string("""
         <!doctype html>
@@ -636,13 +658,31 @@ def dashboard():
                 </tr>
                 {% endfor %}
             </table>
+            <h2 style="margin-top: 40px;">Recent Customer Replies</h2>
+
+            <table>
+                <tr>
+                    <th>Phone</th>
+                    <th>Message</th>
+                    <th>Received</th>
+                </tr>
+            
+                {% for row in inbound_rows %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
         </body>
         </html>
     """,
         total_today=total_today,
         delivered_today=delivered_today,
         failed_today=failed_today,
-        recent_rows=recent_rows
+        recent_rows=recent_rows,
+        inbound_rows=inbound_rows
     )
 
 
