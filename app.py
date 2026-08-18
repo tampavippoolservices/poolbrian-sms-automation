@@ -229,6 +229,41 @@ def poolbrain_webhook():
     print("PoolBrain webhook received:")
     print(data)
 
+    event_type = data.get("event")
+
+    if event_type == "alert.triggered":
+        jobs = data.get("data", {}).get("data", [])
+
+        for job in jobs:
+            customer_id = job.get("CustomerId")
+            job_id = job.get("JobID")
+
+            alert_categories = job.get("AlertCategories", [])
+
+            for category in alert_categories:
+                custom_alerts = category.get("CustomAlert", [])
+
+                for alert in custom_alerts:
+                    alert_name = (
+                        alert.get("AlertName")
+                        or alert.get("type")
+                        or ""
+                    )
+
+                    print(f"Alert detected: {alert_name}")
+
+                    alert_text = alert_name.lower()
+
+                    if (
+                        "water" in alert_text
+                        and "level" in alert_text
+                        and "low" in alert_text
+                    ):
+                        print("WATER LEVEL LOW DETECTED")
+                        print(f"CustomerId: {customer_id}")
+                        print(f"JobID: {job_id}")
+                        print(f"AlertId: {alert.get('alertId')}")
+
     return jsonify({
         "success": True,
         "message": "Webhook received"
