@@ -235,7 +235,7 @@ def poolbrain_webhook():
         jobs = data.get("data", {}).get("data", [])
 
         for job in jobs:
-            customer_id = job.get("CustomerId")
+            customer_id = job.get("CustomerID")
             job_id = job.get("JobID")
 
             alert_categories = job.get("AlertCategories", [])
