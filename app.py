@@ -193,13 +193,15 @@ def send_sms(to_number, message_body):
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
+    status_callback = os.environ.get("TWILIO_STATUS_CALLBACK_URL")
 
     client = Client(account_sid, auth_token)
 
     message = client.messages.create(
         body=message_body,
         from_=twilio_number,
-        to=to_number
+        to=to_number,
+        status_callback=status_callback
     )
 
     return message.sid
@@ -280,6 +282,52 @@ def get_completed_jobs_today():
         for job in jobs
         if job.get("JobStatus") == "Completed"
     ]
+
+@app.route("/twilio-status", methods=["POST"])
+def twilio_status():
+    message_sid = request.form.get("MessageSid")
+    message_status = request.form.get("MessageStatus")
+    error_code = request.form.get("ErrorCode")
+
+    print(
+        "Twilio status update:",
+        message_sid,
+        message_status,
+        error_code
+    )
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sms_delivery_status (
+                    message_sid TEXT PRIMARY KEY,
+                    message_status TEXT,
+                    error_code TEXT,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
+            cur.execute("""
+                INSERT INTO sms_delivery_status (
+                    message_sid,
+                    message_status,
+                    error_code
+                )
+                VALUES (%s, %s, %s)
+                ON CONFLICT (message_sid)
+                DO UPDATE SET
+                    message_status = EXCLUDED.message_status,
+                    error_code = EXCLUDED.error_code,
+                    updated_at = NOW()
+            """, (
+                message_sid,
+                message_status,
+                error_code
+            ))
+
+        conn.commit()
+
+    return "", 204
 
 
 @app.route("/", methods=["GET"])
