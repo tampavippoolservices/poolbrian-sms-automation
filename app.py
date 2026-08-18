@@ -282,19 +282,22 @@ def get_completed_jobs_today():
         for job in jobs
         if job.get("JobStatus") == "Completed"
     ]
-
 @app.route("/twilio-status", methods=["POST"])
 def twilio_status():
     message_sid = request.form.get("MessageSid")
     message_status = request.form.get("MessageStatus")
     error_code = request.form.get("ErrorCode")
+    destination_number = request.form.get("To")
 
     print(
         "Twilio status update:",
         message_sid,
         message_status,
-        error_code
+        error_code,
+        destination_number
     )
+
+    should_alert = False
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -308,24 +311,89 @@ def twilio_status():
             """)
 
             cur.execute("""
+                ALTER TABLE sms_delivery_status
+                ADD COLUMN IF NOT EXISTS destination_number TEXT
+            """)
+
+            cur.execute("""
+                ALTER TABLE sms_delivery_status
+                ADD COLUMN IF NOT EXISTS alert_sent BOOLEAN DEFAULT FALSE
+            """)
+
+            cur.execute("""
+                SELECT alert_sent
+                FROM sms_delivery_status
+                WHERE message_sid = %s
+            """, (message_sid,))
+
+            existing = cur.fetchone()
+
+            already_alerted = (
+                existing is not None
+                and existing[0] is True
+            )
+
+            cur.execute("""
                 INSERT INTO sms_delivery_status (
                     message_sid,
                     message_status,
-                    error_code
+                    error_code,
+                    destination_number
                 )
-                VALUES (%s, %s, %s)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (message_sid)
                 DO UPDATE SET
                     message_status = EXCLUDED.message_status,
                     error_code = EXCLUDED.error_code,
+                    destination_number = EXCLUDED.destination_number,
                     updated_at = NOW()
             """, (
                 message_sid,
                 message_status,
-                error_code
+                error_code,
+                destination_number
             ))
 
+            if (
+                message_status in ("failed", "undelivered")
+                and not already_alerted
+            ):
+                should_alert = True
+
         conn.commit()
+
+    if should_alert:
+        admin_number = os.environ.get("TEST_PHONE_NUMBER")
+        account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+        auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+        twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
+
+        if admin_number:
+            try:
+                client = Client(account_sid, auth_token)
+
+                client.messages.create(
+                    body=(
+                        f"SMS ALERT: Message to {destination_number} "
+                        f"was {message_status}. "
+                        f"Twilio error: {error_code or 'none'}."
+                    ),
+                    from_=twilio_number,
+                    to=admin_number
+                )
+
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            UPDATE sms_delivery_status
+                            SET alert_sent = TRUE
+                            WHERE message_sid = %s
+                        """, (message_sid,))
+
+                    conn.commit()
+
+            except Exception as e:
+                print("Failed to send admin SMS alert:", e)
 
     return "", 204
 
