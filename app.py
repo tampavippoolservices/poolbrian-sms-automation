@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string, Response
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
@@ -9,6 +9,31 @@ import json
 import os
 
 app = Flask(__name__)
+
+def check_dashboard_auth():
+    username = os.environ.get("DASHBOARD_USERNAME")
+    password = os.environ.get("DASHBOARD_PASSWORD")
+
+    auth = request.authorization
+
+    return (
+        auth is not None
+        and auth.username == username
+        and auth.password == password
+    )
+
+
+def require_dashboard_auth():
+    if check_dashboard_auth():
+        return None
+
+    return Response(
+        "Login required",
+        401,
+        {
+            "WWW-Authenticate": 'Basic realm="Tampa VIP SMS Dashboard"'
+        }
+    )
 
 POOLBRAIN_BASE_URL = "https://prodapi.poolbrain.com"
 
@@ -396,6 +421,27 @@ def twilio_status():
                 print("Failed to send admin SMS alert:", e)
 
     return "", 204
+
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    auth_response = require_dashboard_auth()
+
+    if auth_response:
+        return auth_response
+
+    return render_template_string("""
+        <!doctype html>
+        <html>
+        <head>
+            <title>Tampa VIP SMS Dashboard</title>
+        </head>
+        <body>
+            <h1>Tampa VIP SMS Dashboard</h1>
+            <p>Dashboard is working.</p>
+        </body>
+        </html>
+    """)
 
 
 @app.route("/", methods=["GET"])
