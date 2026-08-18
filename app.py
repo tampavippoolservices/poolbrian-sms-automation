@@ -573,11 +573,10 @@ def dashboard():
             <table>
                 <tr>
                     <th>Status</th>
-                        <th>Status</th>
-                        <th>Phone</th>
-                        <th>Type</th>
-                        <th>Error</th>
-                        <th>Updated</th>
+                    <th>Phone</th>
+                    <th>Type</th>
+                    <th>Error</th>
+                    <th>Updated</th>
                 </tr>
 
                 {% for row in recent_rows %}
