@@ -470,6 +470,18 @@ def dashboard():
                 LIMIT 20
             """)
             recent_rows = cur.fetchall()
+            recent_rows = [
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3],
+                    row[4]
+                    .astimezone(ZoneInfo("America/New_York"))
+                    .strftime("%Y-%m-%d %I:%M:%S %p")
+                )
+                for row in recent_rows
+            ]
 
     return render_template_string("""
         <!doctype html>
@@ -549,7 +561,7 @@ def dashboard():
                     <td>{{ row[1] }}</td>
                     <td>{{ row[2] or "Not recorded" }}</td>
                     <td>{{ row[3] or "" }}</td>
-                    <td>{{ row[4].astimezone(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %I:%M:%S %p") }}</td>
+                    <td>{{ row[4] }}</td>
                 </tr>
                 {% endfor %}
             </table>
