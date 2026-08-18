@@ -214,7 +214,7 @@ def mark_baseline_complete():
         conn.commit()
 
 
-def send_sms(to_number, message_body):
+def send_sms(to_number, message_body, message_type="general"):
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
@@ -222,11 +222,21 @@ def send_sms(to_number, message_body):
 
     client = Client(account_sid, auth_token)
 
+    callback_url = status_callback
+
+    if status_callback:
+        separator = "&" if "?" in status_callback else "?"
+        callback_url = (
+            status_callback
+            + separator
+            + urlencode({"message_type": message_type})
+        )
+
     message = client.messages.create(
         body=message_body,
         from_=twilio_number,
         to=to_number,
-        status_callback=status_callback
+        status_callback=callback_url
     )
 
     return message.sid
@@ -308,18 +318,21 @@ def get_completed_jobs_today():
         if job.get("JobStatus") == "Completed"
     ]
 @app.route("/twilio-status", methods=["POST"])
+@app.route("/twilio-status", methods=["POST"])
 def twilio_status():
     message_sid = request.form.get("MessageSid")
     message_status = request.form.get("MessageStatus")
     error_code = request.form.get("ErrorCode")
     destination_number = request.form.get("To")
+    message_type = request.args.get("message_type", "general")
 
     print(
         "Twilio status update:",
         message_sid,
         message_status,
         error_code,
-        destination_number
+        destination_number,
+        message_type
     )
 
     should_alert = False
@@ -346,6 +359,11 @@ def twilio_status():
             """)
 
             cur.execute("""
+                ALTER TABLE sms_delivery_status
+                ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'general'
+            """)
+
+            cur.execute("""
                 SELECT alert_sent
                 FROM sms_delivery_status
                 WHERE message_sid = %s
@@ -363,20 +381,23 @@ def twilio_status():
                     message_sid,
                     message_status,
                     error_code,
-                    destination_number
+                    destination_number,
+                    message_type
                 )
-                VALUES (%s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (message_sid)
                 DO UPDATE SET
                     message_status = EXCLUDED.message_status,
                     error_code = EXCLUDED.error_code,
                     destination_number = EXCLUDED.destination_number,
+                    message_type = EXCLUDED.message_type,
                     updated_at = NOW()
             """, (
                 message_sid,
                 message_status,
                 error_code,
-                destination_number
+                destination_number,
+                message_type
             ))
 
             if (
@@ -421,7 +442,6 @@ def twilio_status():
                 print("Failed to send admin SMS alert:", e)
 
     return "", 204
-
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
