@@ -320,61 +320,61 @@ def poolbrain_webhook():
                     alert_text = alert_name.lower()
 
                     if alert_name == "WaterLevelLow":
-    alert_id = alert.get("alertId")
+                        alert_id = alert.get("alertId")
 
-    print("WATER LEVEL LOW DETECTED")
-    print(f"CustomerId: {customer_id}")
-    print(f"JobID: {job_id}")
-    print(f"AlertId: {alert_id}")
+                        print("WATER LEVEL LOW DETECTED")
+                        print(f"CustomerId: {customer_id}")
+                        print(f"JobID: {job_id}")
+                        print(f"AlertId: {alert_id}")
 
-    init_db()
+                        init_db()
 
-    if alert_already_processed(alert_id):
-        print(f"Water Level Low alert {alert_id} already processed")
-        continue
+                        if alert_already_processed(alert_id):
+                            print(f"Water Level Low alert {alert_id} already processed")
+                            continue
 
-    customer = get_customer(customer_id)
+                        customer = get_customer(customer_id)
 
-    if not customer:
-        print(f"Customer {customer_id} not found")
-        continue
+                        if not customer:
+                            print(f"Customer {customer_id} not found")
+                            continue
 
-    customer_name = customer.get(
-        "CustomerName",
-        "Customer"
-    )
+                        customer_name = customer.get(
+                            "CustomerName",
+                            "Customer"
+                        )
 
-    customer_phone = customer.get("Phone")
+                        customer_phone = customer.get("Phone")
 
-    if not customer_phone:
-        print(f"No phone number for customer {customer_id}")
-        continue
+                        if not customer_phone:
+                            print(f"No phone number for customer {customer_id}")
+                            continue
 
-    message_body = (
-        f"Hi {customer_name}, your pool technician noticed that "
-        f"your pool water level is low. Please add water to the "
-        f"normal operating level when convenient. "
-        f"Tampa VIP Pool Services"
-    )
+                        message_body = (
+                            f"Hi {customer_name}, your pool technician noticed that "
+                            f"your pool water level is low. Please add water to the "
+                            f"normal operating level when convenient. "
+                            f"Tampa VIP Pool Services"
+                        )
 
-    sid = send_sms(
-        customer_phone,
-        message_body
-    )
+                        sid = send_sms(
+                            customer_phone,
+                            message_body
+                        )
 
-    save_processed_alert(
-        alert_id,
-        customer_id,
-        job_id,
-        "WaterLevelLow",
-        "text_sent",
-        sid
-    )
+                        save_processed_alert(
+                            alert_id,
+                            customer_id,
+                            job_id,
+                            "WaterLevelLow",
+                            "text_sent",
+                            sid
+                        )
 
-    print(
-        f"Water Level Low SMS sent to {customer_name}. "
-        f"Twilio SID: {sid}"
-    )
+                        print(
+                            f"Water Level Low SMS sent to {customer_name}. "
+                            f"Twilio SID: {sid}"
+                        )
 
     return jsonify({
         "success": True,
