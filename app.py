@@ -430,18 +430,137 @@ def dashboard():
     if auth_response:
         return auth_response
 
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM sms_delivery_status
+                WHERE updated_at::date =
+                    (NOW() AT TIME ZONE 'America/New_York')::date
+            """)
+            total_today = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM sms_delivery_status
+                WHERE message_status = 'delivered'
+                AND updated_at::date =
+                    (NOW() AT TIME ZONE 'America/New_York')::date
+            """)
+            delivered_today = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM sms_delivery_status
+                WHERE message_status IN ('failed', 'undelivered')
+                AND updated_at::date =
+                    (NOW() AT TIME ZONE 'America/New_York')::date
+            """)
+            failed_today = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT
+                    message_sid,
+                    message_status,
+                    destination_number,
+                    error_code,
+                    updated_at
+                FROM sms_delivery_status
+                ORDER BY updated_at DESC
+                LIMIT 20
+            """)
+            recent_rows = cur.fetchall()
+
     return render_template_string("""
         <!doctype html>
         <html>
         <head>
             <title>Tampa VIP SMS Dashboard</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 1000px;
+                    margin: 40px auto;
+                    padding: 0 20px;
+                }
+
+                .cards {
+                    display: flex;
+                    gap: 20px;
+                    margin-bottom: 30px;
+                }
+
+                .card {
+                    border: 1px solid #ddd;
+                    border-radius: 10px;
+                    padding: 20px;
+                    flex: 1;
+                }
+
+                .number {
+                    font-size: 32px;
+                    font-weight: bold;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+
+                th, td {
+                    border-bottom: 1px solid #ddd;
+                    padding: 10px;
+                    text-align: left;
+                }
+            </style>
         </head>
         <body>
             <h1>Tampa VIP SMS Dashboard</h1>
-            <p>Dashboard is working.</p>
+
+            <div class="cards">
+                <div class="card">
+                    <div>Texts tracked today</div>
+                    <div class="number">{{ total_today }}</div>
+                </div>
+
+                <div class="card">
+                    <div>Delivered today</div>
+                    <div class="number">{{ delivered_today }}</div>
+                </div>
+
+                <div class="card">
+                    <div>Failed / undelivered</div>
+                    <div class="number">{{ failed_today }}</div>
+                </div>
+            </div>
+
+            <h2>Recent SMS Statuses</h2>
+
+            <table>
+                <tr>
+                    <th>Status</th>
+                    <th>Phone</th>
+                    <th>Error</th>
+                    <th>Updated</th>
+                </tr>
+
+                {% for row in recent_rows %}
+                <tr>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td>{{ row[3] or "" }}</td>
+                    <td>{{ row[4] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
         </body>
         </html>
-    """)
+    """,
+        total_today=total_today,
+        delivered_today=delivered_today,
+        failed_today=failed_today,
+        recent_rows=recent_rows
+    )
 
 
 @app.route("/", methods=["GET"])
