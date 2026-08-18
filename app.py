@@ -672,7 +672,8 @@ def poolbrain_webhook():
 
                         sid = send_sms(
                             customer_phone,
-                            message_body
+                            message_body,
+                            "water_level_low"
                         )
 
                         save_processed_alert(
@@ -785,8 +786,9 @@ def process_completed_services():
         )
 
         sid = send_sms(
-            customer_phone,
-            message_body
+    customer_phone,
+    message_body,
+    "completed_service"
         )
 
         save_processed_job(
