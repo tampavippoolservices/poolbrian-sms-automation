@@ -489,6 +489,7 @@ def dashboard():
                 FROM sms_delivery_status
                 ORDER BY updated_at DESC
                 LIMIT 20
+            """)    
             recent_rows = cur.fetchall()
             recent_rows = [
                 (
