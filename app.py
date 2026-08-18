@@ -312,10 +312,12 @@ def process_completed_services():
             )
             continue
 
-        message_body = (
-            f"Hi {customer_name}, your pool service "
-            f"has been completed today. Thank you!"
-        )
+       message_body = (
+    f"Hi {customer_name}, your pool service has been completed. "
+    f"Thank you for choosing Tampa VIP Pool Services! "
+    f"You can view your detailed service report here: "
+    f"https://tampavippoolservices.poolbrain.com"
+)
 
         sid = send_sms(
             customer_phone,
