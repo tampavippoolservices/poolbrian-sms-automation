@@ -317,6 +317,53 @@ def get_completed_jobs_today():
         for job in jobs
         if job.get("JobStatus") == "Completed"
     ]
+@app.route("/incoming-sms", methods=["POST"])
+def incoming_sms():
+    message_sid = request.form.get("MessageSid")
+    from_number = request.form.get("From")
+    to_number = request.form.get("To")
+    message_body = request.form.get("Body", "")
+
+    print(
+        "Incoming customer SMS:",
+        message_sid,
+        from_number,
+        message_body
+    )
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS inbound_sms (
+                    message_sid TEXT PRIMARY KEY,
+                    from_number TEXT NOT NULL,
+                    to_number TEXT,
+                    message_body TEXT,
+                    received_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
+            cur.execute("""
+                INSERT INTO inbound_sms (
+                    message_sid,
+                    from_number,
+                    to_number,
+                    message_body
+                )
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (message_sid) DO NOTHING
+            """, (
+                message_sid,
+                from_number,
+                to_number,
+                message_body
+            ))
+
+        conn.commit()
+
+    return "", 204
+
+
 @app.route("/twilio-status", methods=["POST"])
 @app.route("/twilio-status", methods=["POST"])
 def twilio_status():
