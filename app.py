@@ -1038,6 +1038,54 @@ def process_completed_services():
         f"{skipped_count} jobs were already processed."
     )
 
+@app.route("/review-queue-status", methods=["GET"])
+def review_queue_status():
+    provided_secret = request.headers.get("X-Process-Secret")
+    expected_secret = os.environ.get("PROCESS_SECRET")
+
+    if not expected_secret or provided_secret != expected_secret:
+        return "Unauthorized", 401
+
+    init_db()
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'queued'
+            """)
+            queued_count = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'queued'
+                AND scheduled_for <= NOW()
+            """)
+            due_count = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'first_sent'
+            """)
+            sent_count = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'send_failed'
+            """)
+            failed_count = cur.fetchone()[0]
+
+    return jsonify({
+        "queued": queued_count,
+        "due_now": due_count,
+        "first_messages_sent": sent_count,
+        "send_failed": failed_count
+    })
+
 @app.route("/process-review-requests", methods=["GET"])
 def process_review_requests():
     provided_secret = request.headers.get("X-Process-Secret")
