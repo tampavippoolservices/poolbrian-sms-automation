@@ -326,37 +326,38 @@ def incoming_sms():
 
     customer_name = "Unknown customer"
 
-try:
-    clean_phone = "".join(
-        digit for digit in from_number
-        if digit.isdigit()
-    )
-
-    if clean_phone.startswith("1") and len(clean_phone) == 11:
-        clean_phone = clean_phone[1:]
-
-    result = poolbrain_get(
-        "/v2/customer_detail",
-        {
-            "contactPhoneNumber": clean_phone
-        }
-    )
-
-    customers = result.get("data", [])
-
-    if isinstance(customers, list) and customers:
-        customer_name = customers[0].get(
-            "CustomerName",
-            "Unknown customer"
+    try:
+        clean_phone = "".join(
+            digit for digit in from_number
+            if digit.isdigit()
         )
 
-except Exception as e:
-    print("Customer lookup failed:", e)
+        if clean_phone.startswith("1") and len(clean_phone) == 11:
+            clean_phone = clean_phone[1:]
+
+        result = poolbrain_get(
+            "/v2/customer_detail",
+            {
+                "contactPhoneNumber": clean_phone
+            }
+        )
+
+        customers = result.get("data", [])
+
+        if isinstance(customers, list) and customers:
+            customer_name = customers[0].get(
+                "CustomerName",
+                "Unknown customer"
+            )
+
+    except Exception as e:
+        print("Customer lookup failed:", e)
 
     print(
         "Incoming customer SMS:",
         message_sid,
         from_number,
+        customer_name,
         message_body
     )
 
@@ -388,34 +389,32 @@ except Exception as e:
                 message_body
             ))
 
-            conn.commit()
+        conn.commit()
 
-            company_number = os.environ.get("COMPANY_PHONE_NUMBER")
-            account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-            twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
-        
-            if company_number:
-                try:
-                    client = Client(account_sid, auth_token)
-        
-                    client.messages.create(
-                        body=(
-                            f"Customer SMS reply from {customer_name} "
-                            f"({from_number}): {message_body}"
-                        ),
-                        from_=twilio_number,
-                        to=company_number
-                    )
-        
-                    print("Customer reply forwarded to company phone.")
-        
-                except Exception as e:
-                    print("Failed to forward customer reply:", e)
-        
-            return "", 204
+    company_number = os.environ.get("COMPANY_PHONE_NUMBER")
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
 
+    if company_number:
+        try:
+            client = Client(account_sid, auth_token)
 
+            client.messages.create(
+                body=(
+                    f"Customer SMS reply from {customer_name} "
+                    f"({from_number}): {message_body}"
+                ),
+                from_=twilio_number,
+                to=company_number
+            )
+
+            print("Customer reply forwarded to company phone.")
+
+        except Exception as e:
+            print("Failed to forward customer reply:", e)
+
+    return "", 204
 @app.route("/twilio-status", methods=["POST"])
 @app.route("/twilio-status", methods=["POST"])
 def twilio_status():
