@@ -79,6 +79,25 @@ def init_db():
                 )
             """)
 
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS review_requests (
+                    record_id BIGINT PRIMARY KEY,
+                    customer_id BIGINT NOT NULL,
+                    customer_phone TEXT,
+                    status TEXT NOT NULL DEFAULT 'queued',
+                    scheduled_for TIMESTAMPTZ NOT NULL,
+                    first_message_sid TEXT,
+                    first_sent_at TIMESTAMPTZ,
+                    link_clicked_at TIMESTAMPTZ,
+                    customer_replied_at TIMESTAMPTZ,
+                    reminder_message_sid TEXT,
+                    reminder_sent_at TIMESTAMPTZ,
+                    cancelled_reason TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
         conn.commit()
 
 
