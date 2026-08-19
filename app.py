@@ -551,7 +551,7 @@ def dashboard():
                 )
                 for row in recent_rows
             ]
-             cur.execute("""
+            cur.execute("""
                 SELECT
                     from_number,
                     message_body,
