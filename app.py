@@ -473,6 +473,38 @@ def incoming_sms():
                 message_body
             ))
 
+            from_digits = "".join(
+                digit for digit in (from_number or "")
+                if digit.isdigit()
+            )
+            
+            cur.execute("""
+                UPDATE review_requests
+                SET
+                    customer_replied_at = NOW(),
+                    status = 'completed',
+                    updated_at = NOW()
+                WHERE record_id = (
+                    SELECT record_id
+                    FROM review_requests
+                    WHERE RIGHT(
+                        regexp_replace(
+                            customer_phone,
+                            '[^0-9]',
+                            '',
+                            'g'
+                        ),
+                        10
+                    ) = RIGHT(%s, 10)
+                    AND status IN (
+                        'first_sent',
+                        'reminder_sent'
+                    )
+                    ORDER BY first_sent_at DESC
+                    LIMIT 1
+                )
+            """, (from_digits,))
+
         conn.commit()
 
     company_number = os.environ.get("COMPANY_PHONE_NUMBER")
