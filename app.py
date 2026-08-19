@@ -711,6 +711,49 @@ def twilio_status():
 
     return "", 204
 
+@app.route(
+    "/confirm-review/<int:record_id>",
+    methods=["POST"]
+)
+def confirm_review(record_id):
+    auth_response = require_dashboard_auth()
+
+    if auth_response:
+        return auth_response
+
+    reviewer_name = request.form.get(
+        "reviewer_name",
+        ""
+    ).strip()
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE review_requests
+                SET
+                    status = 'confirmed_review',
+                    confirmed_review_at = COALESCE(
+                        confirmed_review_at,
+                        NOW()
+                    ),
+                    google_reviewer_name = NULLIF(%s, ''),
+                    updated_at = NOW()
+                WHERE record_id = %s
+                RETURNING record_id
+            """, (
+                reviewer_name,
+                record_id
+            ))
+
+            confirmed = cur.fetchone()
+
+        conn.commit()
+
+    if not confirmed:
+        return "Review request not found.", 404
+
+    return redirect("/dashboard")
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     auth_response = require_dashboard_auth()
