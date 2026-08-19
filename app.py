@@ -761,6 +761,45 @@ def confirm_review(record_id):
 
     return redirect("/dashboard")
 
+@app.route(
+    "/undo-review-confirmation/<int:record_id>",
+    methods=["POST"]
+)
+def undo_review_confirmation(record_id):
+    auth_response = require_dashboard_auth()
+
+    if auth_response:
+        return auth_response
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE review_requests
+                SET
+                    status = CASE
+                        WHEN link_clicked_at IS NOT NULL
+                            THEN 'clicked'
+                        WHEN first_sent_at IS NOT NULL
+                            THEN 'first_sent'
+                        ELSE 'queued'
+                    END,
+                    confirmed_review_at = NULL,
+                    google_review_id = NULL,
+                    google_reviewer_name = NULL,
+                    updated_at = NOW()
+                WHERE record_id = %s
+                AND confirmed_review_at IS NOT NULL
+                RETURNING record_id
+            """, (record_id,))
+
+            undone = cur.fetchone()
+
+        conn.commit()
+
+    if not undone:
+        return "Confirmed review not found.", 404
+
+    return redirect("/dashboard")
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     auth_response = require_dashboard_auth()
@@ -1063,7 +1102,14 @@ def dashboard():
                             </button>
                         </form>
                         {% else %}
-                            Confirmed
+                            <form
+                                method="post"
+                                action="/undo-review-confirmation/{{ row[0] }}"
+                            >
+                                <button type="submit">
+                                    Undo confirmation
+                                </button>
+                            </form>
                         {% endif %}
                     </td>
                 </tr>
