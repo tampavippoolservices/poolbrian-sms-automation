@@ -1057,10 +1057,10 @@ def test_review_sms():
         return "GOOGLE_REVIEW_URL is missing.", 500
 
     message_body = (
-        "Hi, thank you for choosing Tampa VIP Pool Services. "
-        "Would you share your honest experience with us on Google? "
-        f"{review_url} "
-        "If anything needs our attention, please reply here. "
+        "Hi, thank you for choosing Tampa VIP Pool Services!\n\n"
+        "We would appreciate your honest feedback on Google:\n\n"
+        f"{review_url}\n\n"
+        "If anything needs our attention, please reply to this message. "
         "Reply STOP to opt out."
     )
 
