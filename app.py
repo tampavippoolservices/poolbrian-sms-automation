@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import psycopg
 import json
 import os
+import secrets
 
 app = Flask(__name__)
 
@@ -242,6 +243,8 @@ def queue_review_request(
         + timedelta(hours=3)
     )
 
+    review_token = secrets.token_urlsafe(24)
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -274,7 +277,8 @@ def queue_review_request(
                     customer_id,
                     customer_phone,
                     status,
-                    scheduled_for
+                    scheduled_for,
+                    review_token
                 )
                 VALUES (%s, %s, %s, 'queued', %s)
                 ON CONFLICT (record_id) DO NOTHING
@@ -282,7 +286,8 @@ def queue_review_request(
                 record_id,
                 customer_id,
                 customer_phone,
-                scheduled_for
+                scheduled_for,
+                review_token
             ))
 
             request_created = cur.rowcount == 1
