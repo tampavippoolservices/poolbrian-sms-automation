@@ -388,7 +388,7 @@ except Exception as e:
                 message_body
             ))
 
-        conn.commit()
+            conn.commit()
 
             company_number = os.environ.get("COMPANY_PHONE_NUMBER")
             account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
