@@ -727,6 +727,8 @@ def confirm_review(record_id):
     ).strip()
 
     with get_db_connection() as conn:
+
+    with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE review_requests
