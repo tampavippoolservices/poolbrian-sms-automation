@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template_string, Response
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import psycopg
 import json
@@ -204,6 +204,71 @@ def save_processed_job(
             ))
 
         conn.commit()
+
+def queue_review_request(
+    record_id,
+    customer_id,
+    customer_phone
+):
+    scheduled_for = (
+        datetime.now(ZoneInfo("America/New_York"))
+        + timedelta(hours=3)
+    )
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 1
+                FROM review_requests
+                WHERE customer_id = %s
+                AND status IN (
+                    'queued',
+                    'first_sent',
+                    'reminder_sent',
+                    'completed'
+                )
+                AND created_at >= NOW() - INTERVAL '120 days'
+                LIMIT 1
+            """, (customer_id,))
+
+            recent_request = cur.fetchone()
+
+            if recent_request:
+                print(
+                    f"Review request skipped for customer "
+                    f"{customer_id}: request sent or queued "
+                    f"within the last 120 days."
+                )
+                return False
+
+            cur.execute("""
+                INSERT INTO review_requests (
+                    record_id,
+                    customer_id,
+                    customer_phone,
+                    status,
+                    scheduled_for
+                )
+                VALUES (%s, %s, %s, 'queued', %s)
+                ON CONFLICT (record_id) DO NOTHING
+            """, (
+                record_id,
+                customer_id,
+                customer_phone,
+                scheduled_for
+            ))
+
+            request_created = cur.rowcount == 1
+
+        conn.commit()
+
+    if request_created:
+        print(
+            f"Review request queued for customer "
+            f"{customer_id} at {scheduled_for}."
+        )
+
+    return request_created
 
 
 def baseline_is_complete():
