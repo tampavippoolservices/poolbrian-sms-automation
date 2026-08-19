@@ -255,17 +255,24 @@ def queue_review_request(
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT 1
-                FROM review_requests
-                WHERE customer_id = %s
-                AND status IN (
-                    'queued',
-                    'first_sent',
-                    'reminder_sent',
-                    'completed'
+               SELECT 1
+               FROM review_requests
+               WHERE customer_id = %s
+               AND (
+                    confirmed_review_at IS NOT NULL
+                    OR (
+                        status IN (
+                            'queued',
+                            'first_sent',
+                            'clicked',
+                            'reminder_sent',
+                            'completed'
+                        )
+                        AND created_at >= NOW() - INTERVAL '120 days'
+                    )
                 )
-                AND created_at >= NOW() - INTERVAL '120 days'
                 LIMIT 1
+                
             """, (customer_id,))
 
             recent_request = cur.fetchone()
