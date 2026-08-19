@@ -1039,6 +1039,40 @@ def process_completed_services():
     )
 
 
+@app.route("/test-review-sms", methods=["GET"])
+def test_review_sms():
+    provided_secret = request.headers.get("X-Process-Secret")
+    expected_secret = os.environ.get("PROCESS_SECRET")
+
+    if not expected_secret or provided_secret != expected_secret:
+        return "Unauthorized", 401
+
+    test_number = os.environ.get("TEST_PHONE_NUMBER")
+    review_url = os.environ.get("GOOGLE_REVIEW_URL")
+
+    if not test_number:
+        return "TEST_PHONE_NUMBER is missing.", 500
+
+    if not review_url:
+        return "GOOGLE_REVIEW_URL is missing.", 500
+
+    message_body = (
+        "Hi, thank you for choosing Tampa VIP Pool Services. "
+        "Would you share your honest experience with us on Google? "
+        f"{review_url} "
+        "If anything needs our attention, please reply here. "
+        "Reply STOP to opt out."
+    )
+
+    sid = send_sms(
+        test_number,
+        message_body,
+        "google_review_test"
+    )
+
+    return f"Review test SMS sent! Message ID: {sid}"
+
+
 @app.route("/test-sms", methods=["GET"])
 def test_sms():
     test_number = os.environ.get(
