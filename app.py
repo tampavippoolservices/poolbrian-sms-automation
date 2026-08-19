@@ -1023,7 +1023,13 @@ def process_completed_services():
             "text_sent",
             sid
         )
-
+        
+        queue_review_request(
+            record_id,
+            customer_id,
+            customer_phone
+        )
+        
         sent_count += 1
 
     return (
