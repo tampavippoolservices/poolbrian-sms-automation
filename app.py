@@ -361,6 +361,29 @@ def incoming_sms():
 
         conn.commit()
 
+    company_number = os.environ.get("COMPANY_PHONE_NUMBER")
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
+
+    if company_number:
+        try:
+            client = Client(account_sid, auth_token)
+
+            client.messages.create(
+                body=(
+                    f"Customer SMS reply from {from_number}: "
+                    f"{message_body}"
+                ),
+                from_=twilio_number,
+                to=company_number
+            )
+
+            print("Customer reply forwarded to company phone.")
+
+        except Exception as e:
+            print("Failed to forward customer reply:", e)
+
     return "", 204
 
 
