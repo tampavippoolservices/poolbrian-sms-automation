@@ -726,7 +726,12 @@ def confirm_review(record_id):
         ""
     ).strip()
 
-    with get_db_connection() as conn:
+    if not reviewer_name:
+    return (
+        "Enter the name shown on Google before "
+        "confirming this review.",
+        400
+    )
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
