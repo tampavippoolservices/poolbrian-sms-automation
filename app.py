@@ -133,6 +133,11 @@ def init_db():
                 WHERE review_token IS NOT NULL
             """)
 
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS customer_name TEXT
+            """)
+
         conn.commit()
 
 
@@ -243,6 +248,7 @@ def save_processed_job(
 def queue_review_request(
     record_id,
     customer_id,
+    customer_name,
     customer_phone
 ):
     scheduled_for = (
@@ -289,16 +295,18 @@ def queue_review_request(
                 INSERT INTO review_requests (
                     record_id,
                     customer_id,
+                    customer_name,
                     customer_phone,
                     status,
                     scheduled_for,
                     review_token
                 )
-                VALUES (%s, %s, %s, 'queued', %s)
+                VALUES (%s, %s, %s,%s, 'queued',%s, %s)
                 ON CONFLICT (record_id) DO NOTHING
             """, (
                 record_id,
                 customer_id,
+                customer_name,
                 customer_phone,
                 scheduled_for,
                 review_token
@@ -1162,6 +1170,7 @@ def process_completed_services():
         queue_review_request(
             record_id,
             customer_id,
+            customer_name,
             customer_phone
         )
         
