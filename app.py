@@ -693,6 +693,35 @@ def dashboard():
             failed_today = cur.fetchone()[0]
 
             cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'queued'
+            """)
+            reviews_queued = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'queued'
+                AND scheduled_for <= NOW()
+            """)
+            reviews_due = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'first_sent'
+            """)
+            reviews_sent = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM review_requests
+                WHERE status = 'send_failed'
+            """)
+            reviews_failed = cur.fetchone()[0]
+
+            cur.execute("""
                 SELECT
                     message_sid,
                     message_status,
@@ -804,6 +833,30 @@ def dashboard():
                 </div>
             </div>
 
+            <h2>Google Review Requests</h2>
+
+            <div class="cards">
+                <div class="card">
+                    <div>Queued</div>
+                    <div class="number">{{ reviews_queued }}</div>
+                </div>
+            
+                <div class="card">
+                    <div>Due now</div>
+                    <div class="number">{{ reviews_due }}</div>
+                </div>
+            
+                <div class="card">
+                    <div>First messages sent</div>
+                    <div class="number">{{ reviews_sent }}</div>
+                </div>
+            
+                <div class="card">
+                    <div>Send failures</div>
+                    <div class="number">{{ reviews_failed }}</div>
+                </div>
+            </div>
+
             <h2>Recent SMS Statuses</h2>
 
             <table>
@@ -848,6 +901,10 @@ def dashboard():
         total_today=total_today,
         delivered_today=delivered_today,
         failed_today=failed_today,
+        reviews_queued=reviews_queued,
+        reviews_due=reviews_due,
+        reviews_sent=reviews_sent,
+        reviews_failed=reviews_failed,
         recent_rows=recent_rows,
         inbound_rows=inbound_rows
     )
