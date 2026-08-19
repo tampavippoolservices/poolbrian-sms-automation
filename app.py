@@ -324,6 +324,35 @@ def incoming_sms():
     to_number = request.form.get("To")
     message_body = request.form.get("Body", "")
 
+    customer_name = "Unknown customer"
+
+try:
+    clean_phone = "".join(
+        digit for digit in from_number
+        if digit.isdigit()
+    )
+
+    if clean_phone.startswith("1") and len(clean_phone) == 11:
+        clean_phone = clean_phone[1:]
+
+    result = poolbrain_get(
+        "/v2/customer_detail",
+        {
+            "contactPhoneNumber": clean_phone
+        }
+    )
+
+    customers = result.get("data", [])
+
+    if isinstance(customers, list) and customers:
+        customer_name = customers[0].get(
+            "CustomerName",
+            "Unknown customer"
+        )
+
+except Exception as e:
+    print("Customer lookup failed:", e)
+
     print(
         "Incoming customer SMS:",
         message_sid,
@@ -372,8 +401,8 @@ def incoming_sms():
 
             client.messages.create(
                 body=(
-                    f"Customer SMS reply from {from_number}: "
-                    f"{message_body}"
+                    f"Customer SMS reply from {customer_name} "
+                    f"({from_number}): {message_body}"
                 ),
                 from_=twilio_number,
                 to=company_number
