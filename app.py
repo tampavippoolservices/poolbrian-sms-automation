@@ -1267,6 +1267,13 @@ def process_review_requests():
     if not review_url:
         return "GOOGLE_REVIEW_URL is missing.", 500
 
+    public_base_url = os.environ.get("PUBLIC_BASE_URL")
+
+    if not public_base_url:
+        return "PUBLIC_BASE_URL is missing.", 500
+    
+    public_base_url = public_base_url.rstrip("/")
+
     init_db()
 
     with get_db_connection() as conn:
@@ -1275,7 +1282,8 @@ def process_review_requests():
                 SELECT
                     record_id,
                     customer_id,
-                    customer_phone
+                    customer_phone,
+                    review_token
                 FROM review_requests
                 WHERE status = 'queued'
                 AND scheduled_for <= NOW()
@@ -1288,7 +1296,34 @@ def process_review_requests():
     sent_count = 0
     failed_count = 0
 
-    for record_id, customer_id, customer_phone in due_requests:
+    for (
+        record_id,
+        customer_id,
+        customer_phone,
+        review_token
+    ) in due_requests:
+        if not review_token:
+            review_token = secrets.token_urlsafe(24)
+        
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            review_token = %s,
+                            updated_at = NOW()
+                        WHERE record_id = %s
+                        AND review_token IS NULL
+                    """, (
+                        review_token,
+                        record_id
+                    ))
+        
+                conn.commit()
+        
+        tracked_review_url = (
+            f"{public_base_url}/review/{review_token}"
+        )
         if not customer_phone:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -1310,7 +1345,7 @@ def process_review_requests():
         message_body = (
             "Hi, thank you for choosing Tampa VIP Pool Services!\n\n"
             "We would appreciate your honest feedback on Google:\n\n"
-            f"{review_url}\n\n"
+            f"{tracked_review_url}\n\n"
             "If anything needs our attention, please reply to this message. "
             "Reply STOP to opt out."
         )
