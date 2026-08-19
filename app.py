@@ -98,6 +98,33 @@ def init_db():
                 )
             """)
 
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS review_token TEXT
+            """)
+            
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS confirmed_review_at TIMESTAMPTZ
+            """)
+            
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS google_review_id TEXT
+            """)
+            
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS google_reviewer_name TEXT
+            """)
+            
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                review_requests_review_token_key
+                ON review_requests (review_token)
+                WHERE review_token IS NOT NULL
+            """)
+
         conn.commit()
 
 
