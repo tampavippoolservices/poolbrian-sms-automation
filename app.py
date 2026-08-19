@@ -1,4 +1,11 @@
-from flask import Flask, request, jsonify, render_template_string, Response
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    render_template_string,
+    Response,
+    redirect
+)
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
@@ -1158,6 +1165,41 @@ def process_completed_services():
         f"{sent_count} new service texts sent. "
         f"{skipped_count} jobs were already processed."
     )
+
+@app.route("/review/<review_token>", methods=["GET"])
+def open_google_review(review_token):
+    review_url = os.environ.get("GOOGLE_REVIEW_URL")
+
+    if not review_url:
+        return "Google review link is unavailable.", 500
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE review_requests
+                SET
+                    link_clicked_at = COALESCE(
+                        link_clicked_at,
+                        NOW()
+                    ),
+                    status = CASE
+                        WHEN confirmed_review_at IS NOT NULL
+                            THEN status
+                        ELSE 'clicked'
+                    END,
+                    updated_at = NOW()
+                WHERE review_token = %s
+                RETURNING record_id
+            """, (review_token,))
+
+            tracked_request = cur.fetchone()
+
+        conn.commit()
+
+    if not tracked_request:
+        return "This review link is invalid or expired.", 404
+
+    return redirect(review_url, code=302)
 
 @app.route("/review-queue-status", methods=["GET"])
 def review_queue_status():
