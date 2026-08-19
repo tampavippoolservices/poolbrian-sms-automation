@@ -866,6 +866,30 @@ def dashboard():
                 )
                 for row in inbound_rows
             ]
+            cur.execute("""
+                SELECT
+                    record_id,
+                    customer_name,
+                    status,
+                    TO_CHAR(
+                        first_sent_at AT TIME ZONE 'America/New_York',
+                        'YYYY-MM-DD HH12:MI AM'
+                    ),
+                    TO_CHAR(
+                        link_clicked_at AT TIME ZONE 'America/New_York',
+                        'YYYY-MM-DD HH12:MI AM'
+                    ),
+                    TO_CHAR(
+                        confirmed_review_at AT TIME ZONE 'America/New_York',
+                        'YYYY-MM-DD HH12:MI AM'
+                    ),
+                    google_reviewer_name
+                FROM review_requests
+                ORDER BY created_at DESC
+                LIMIT 50
+            """)
+            
+            review_rows = cur.fetchall()
 
     return render_template_string("""
         <!doctype html>
@@ -992,6 +1016,52 @@ def dashboard():
                 </tr>
                 {% endfor %}
             </table>
+
+            <h2 style="margin-top: 40px;">
+                Google Review Tracking
+            </h2>
+            
+            <table>
+                <tr>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Sent</th>
+                    <th>Clicked</th>
+                    <th>Confirmed</th>
+                    <th>Google reviewer</th>
+                    <th>Action</th>
+                </tr>
+            
+                {% for row in review_rows %}
+                <tr>
+                    <td>{{ row[1] or "Unknown" }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td>{{ row[3] or "" }}</td>
+                    <td>{{ row[4] or "" }}</td>
+                    <td>{{ row[5] or "" }}</td>
+                    <td>{{ row[6] or "" }}</td>
+                    <td>
+                        {% if row[2] != "confirmed_review" %}
+                        <form
+                            method="post"
+                            action="/confirm-review/{{ row[0] }}"
+                        >
+                            <input
+                                type="text"
+                                name="reviewer_name"
+                                placeholder="Name shown on Google"
+                            >
+                            <button type="submit">
+                                Confirm review
+                            </button>
+                        </form>
+                        {% else %}
+                            Confirmed
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
         </body>
         </html>
     """,
@@ -1003,7 +1073,8 @@ def dashboard():
         reviews_sent=reviews_sent,
         reviews_failed=reviews_failed,
         recent_rows=recent_rows,
-        inbound_rows=inbound_rows
+        inbound_rows=inbound_rows,
+        review_rows=review_rows
     )
 
 
