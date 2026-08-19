@@ -1038,6 +1038,135 @@ def process_completed_services():
         f"{skipped_count} jobs were already processed."
     )
 
+@app.route("/process-review-requests", methods=["GET"])
+def process_review_requests():
+    provided_secret = request.headers.get("X-Process-Secret")
+    expected_secret = os.environ.get("PROCESS_SECRET")
+
+    if not expected_secret or provided_secret != expected_secret:
+        return "Unauthorized", 401
+
+    now = datetime.now(ZoneInfo("America/New_York"))
+
+    if now.hour < 9 or now.hour >= 19:
+        return "Outside review-message hours.", 200
+
+    review_url = os.environ.get("GOOGLE_REVIEW_URL")
+
+    if not review_url:
+        return "GOOGLE_REVIEW_URL is missing.", 500
+
+    init_db()
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    record_id,
+                    customer_id,
+                    customer_phone
+                FROM review_requests
+                WHERE status = 'queued'
+                AND scheduled_for <= NOW()
+                ORDER BY scheduled_for ASC
+                LIMIT 50
+            """)
+
+            due_requests = cur.fetchall()
+
+    sent_count = 0
+    failed_count = 0
+
+    for record_id, customer_id, customer_phone in due_requests:
+        if not customer_phone:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            status = 'cancelled',
+                            cancelled_reason = 'no_phone',
+                            updated_at = NOW()
+                        WHERE record_id = %s
+                        AND status = 'queued'
+                    """, (record_id,))
+
+                conn.commit()
+
+            failed_count += 1
+            continue
+
+        message_body = (
+            "Hi, thank you for choosing Tampa VIP Pool Services!\n\n"
+            "We would appreciate your honest feedback on Google:\n\n"
+            f"{review_url}\n\n"
+            "If anything needs our attention, please reply to this message. "
+            "Reply STOP to opt out."
+        )
+
+        try:
+            sid = send_sms(
+                customer_phone,
+                message_body,
+                "google_review"
+            )
+
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            status = 'first_sent',
+                            first_message_sid = %s,
+                            first_sent_at = NOW(),
+                            updated_at = NOW()
+                        WHERE record_id = %s
+                        AND status = 'queued'
+                    """, (
+                        sid,
+                        record_id
+                    ))
+
+                conn.commit()
+
+            sent_count += 1
+
+            print(
+                f"Google review SMS sent for record "
+                f"{record_id}. Twilio SID: {sid}"
+            )
+
+        except Exception as e:
+            print(
+                f"Google review SMS failed for record "
+                f"{record_id}: {e}"
+            )
+
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            status = 'send_failed',
+                            cancelled_reason = %s,
+                            updated_at = NOW()
+                        WHERE record_id = %s
+                        AND status = 'queued'
+                    """, (
+                        str(e)[:500],
+                        record_id
+                    ))
+
+                conn.commit()
+
+            failed_count += 1
+
+    return (
+        f"Review processing complete. "
+        f"{sent_count} messages sent. "
+        f"{failed_count} requests failed or were cancelled."
+    )
+
 
 @app.route("/test-review-sms", methods=["GET"])
 def test_review_sms():
