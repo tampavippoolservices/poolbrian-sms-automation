@@ -138,6 +138,27 @@ def init_db():
                 ADD COLUMN IF NOT EXISTS customer_name TEXT
             """)
 
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS google_reviews (
+                    google_review_id TEXT PRIMARY KEY,
+                    reviewer_name TEXT,
+                    star_rating TEXT,
+                    review_comment TEXT,
+                    review_created_at TIMESTAMPTZ,
+                    review_updated_at TIMESTAMPTZ,
+                    matched_record_id BIGINT,
+                    match_status TEXT NOT NULL DEFAULT 'unmatched',
+                    imported_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS
+                google_reviews_match_status_idx
+                ON google_reviews (match_status)
+            """)
+
         conn.commit()
 
 
