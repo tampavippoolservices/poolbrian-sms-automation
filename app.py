@@ -800,6 +800,55 @@ def undo_review_confirmation(record_id):
         return "Confirmed review not found.", 404
 
     return redirect("/dashboard")
+@app.route("/google/connect", methods=["GET"])
+def google_connect():
+    auth_response = require_dashboard_auth()
+
+    if auth_response:
+        return auth_response
+
+    client_id = os.environ.get(
+        "GOOGLE_OAUTH_CLIENT_ID"
+    )
+    redirect_uri = os.environ.get(
+        "GOOGLE_OAUTH_REDIRECT_URI"
+    )
+
+    if not client_id or not redirect_uri:
+        return "Google OAuth configuration is missing.", 500
+
+    oauth_state = secrets.token_urlsafe(32)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO automation_state (key, value)
+                VALUES ('google_oauth_state', %s)
+                ON CONFLICT (key)
+                DO UPDATE SET value = EXCLUDED.value
+            """, (oauth_state,))
+
+        conn.commit()
+
+    authorization_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+        + urlencode({
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": (
+                "https://www.googleapis.com/auth/"
+                "business.manage"
+            ),
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "true",
+            "state": oauth_state
+        })
+    )
+
+    return redirect(authorization_url)
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     auth_response = require_dashboard_auth()
