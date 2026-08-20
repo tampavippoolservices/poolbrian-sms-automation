@@ -17,6 +17,8 @@ import psycopg
 import json
 import os
 import secrets
+import hmac
+import hashlib
 
 app = Flask(__name__)
 
@@ -83,7 +85,31 @@ def valid_twilio_request():
     
 POOLBRAIN_BASE_URL = "https://prodapi.poolbrain.com"
 
+def valid_poolbrain_webhook():
+    signing_secret = os.environ.get(
+        "POOLBRAIN_WEBHOOK_SIGNING_SECRET"
+    )
+    received_signature = request.headers.get(
+        "X-Webhook-Signature",
+        ""
+    )
 
+    if not signing_secret or not received_signature:
+        return False
+
+    raw_request_body = request.get_data()
+
+    expected_signature = hmac.new(
+        signing_secret.encode("utf-8"),
+        raw_request_body,
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(
+        expected_signature,
+        received_signature.strip()
+    )
+    
 def get_db_connection():
     database_url = os.environ.get("DATABASE_URL")
 
@@ -1515,10 +1541,20 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def poolbrain_webhook():
+    if not valid_poolbrain_webhook():
+        print("Rejected invalid PoolBrain webhook.")
+        return jsonify({
+            "success": False,
+            "message": "Unauthorized"
+        }), 403
+
     data = request.get_json(silent=True) or {}
 
-    print("PoolBrain webhook received:")
-    print(data)
+    print(
+        "PoolBrain webhook received:",
+        data.get("id"),
+        data.get("event")
+    )
 
     event_type = data.get("event")
 
