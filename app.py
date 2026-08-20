@@ -710,8 +710,10 @@ def incoming_sms():
 
     return "", 204
 @app.route("/twilio-status", methods=["POST"])
-@app.route("/twilio-status", methods=["POST"])
 def twilio_status():
+    if not valid_twilio_request():
+        print("Rejected invalid Twilio status callback.")
+        return "Unauthorized", 403
     message_sid = request.form.get("MessageSid")
     message_status = request.form.get("MessageStatus")
     error_code = request.form.get("ErrorCode")
