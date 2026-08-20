@@ -8,6 +8,7 @@ from flask import (
 )
 from twilio.rest import Client
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -1012,6 +1013,78 @@ def google_oauth_callback():
         </body>
         </html>
     """)
+
+@app.route("/google/test-connection", methods=["GET"])
+def google_test_connection():
+    auth_response = require_dashboard_auth()
+
+    if auth_response:
+        return auth_response
+
+    try:
+        access_token = get_google_access_token()
+
+        accounts_request = Request(
+            (
+                "https://mybusinessaccountmanagement."
+                "googleapis.com/v1/accounts"
+            ),
+            headers={
+                "Authorization": (
+                    f"Bearer {access_token}"
+                ),
+                "Accept": "application/json"
+            }
+        )
+
+        with urlopen(
+            accounts_request,
+            timeout=15
+        ) as response:
+            accounts_data = json.loads(
+                response.read().decode("utf-8")
+            )
+
+    except HTTPError as e:
+        print(
+            "Google Business Profile API error:",
+            e.code,
+            e.read().decode("utf-8")
+        )
+
+        return jsonify({
+            "connected": False,
+            "http_status": e.code,
+            "message": (
+                "Google API access is pending, disabled, "
+                "or unavailable for this project."
+            )
+        }), e.code
+
+    except Exception as e:
+        print("Google connection test failed:", e)
+
+        return jsonify({
+            "connected": False,
+            "message": str(e)
+        }), 500
+
+    accounts = accounts_data.get("accounts", [])
+
+    return jsonify({
+        "connected": True,
+        "account_count": len(accounts),
+        "accounts": [
+            {
+                "name": account.get("name"),
+                "account_name": account.get(
+                    "accountName"
+                ),
+                "type": account.get("type")
+            }
+            for account in accounts
+        ]
+    })
 
 @app.route("/google/connect", methods=["GET"])
 def google_connect():
