@@ -7,6 +7,7 @@ from flask import (
     redirect
 )
 from twilio.rest import Client
+from twilio.request_validator import RequestValidator
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -43,7 +44,43 @@ def require_dashboard_auth():
             "WWW-Authenticate": 'Basic realm="Tampa VIP SMS Dashboard"'
         }
     )
+def valid_twilio_request():
+    auth_token = os.environ.get(
+        "TWILIO_AUTH_TOKEN"
+    )
+    signature = request.headers.get(
+        "X-Twilio-Signature",
+        ""
+    )
+    public_base_url = os.environ.get(
+        "PUBLIC_BASE_URL"
+    )
 
+    if (
+        not auth_token
+        or not signature
+        or not public_base_url
+    ):
+        return False
+
+    requested_path = request.full_path
+
+    if requested_path.endswith("?"):
+        requested_path = requested_path[:-1]
+
+    validation_url = (
+        public_base_url.rstrip("/")
+        + requested_path
+    )
+
+    validator = RequestValidator(auth_token)
+
+    return validator.validate(
+        validation_url,
+        request.form,
+        signature
+    )
+    
 POOLBRAIN_BASE_URL = "https://prodapi.poolbrain.com"
 
 
@@ -541,6 +578,9 @@ def get_completed_jobs_today():
     ]
 @app.route("/incoming-sms", methods=["POST"])
 def incoming_sms():
+    if not valid_twilio_request():
+        print("Rejected invalid incoming Twilio request.")
+        return "Unauthorized", 403
     message_sid = request.form.get("MessageSid")
     from_number = request.form.get("From")
     to_number = request.form.get("To")
