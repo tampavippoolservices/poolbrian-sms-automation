@@ -1,4 +1,4 @@
-from flask import (
++-from flask import (
     Flask,
     request,
     jsonify,
@@ -1968,27 +1968,31 @@ def test_review_sms():
 
 @app.route("/test-sms", methods=["GET"])
 def test_sms():
+    provided_secret = request.headers.get(
+        "X-Process-Secret"
+    )
+    expected_secret = os.environ.get(
+        "PROCESS_SECRET"
+    )
+
+    if (
+        not expected_secret
+        or provided_secret != expected_secret
+    ):
+        return "Unauthorized", 401
+
     test_number = os.environ.get(
         "TEST_PHONE_NUMBER"
     )
 
+    if not test_number:
+        return "TEST_PHONE_NUMBER is missing.", 500
+
     sid = send_sms(
         test_number,
         "Test successful! PoolBrain SMS Automation "
-        "is connected to Twilio."
+        "is connected to Twilio.",
+        "general_test"
     )
 
     return f"SMS sent! Message ID: {sid}"
-
-
-if __name__ == "__main__":
-    init_db()
-
-    port = int(
-        os.environ.get("PORT", 5000)
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
