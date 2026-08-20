@@ -800,6 +800,136 @@ def undo_review_confirmation(record_id):
         return "Confirmed review not found.", 404
 
     return redirect("/dashboard")
+
+@app.route("/google/oauth/callback", methods=["GET"])
+def google_oauth_callback():
+    authorization_error = request.args.get("error")
+    authorization_code = request.args.get("code")
+    returned_state = request.args.get("state")
+
+    if authorization_error:
+        return (
+            f"Google authorization failed: "
+            f"{authorization_error}",
+            400
+        )
+
+    if not authorization_code or not returned_state:
+        return "Google authorization response is incomplete.", 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT value
+                FROM automation_state
+                WHERE key = 'google_oauth_state'
+            """)
+
+            state_row = cur.fetchone()
+
+    expected_state = (
+        state_row[0]
+        if state_row
+        else None
+    )
+
+    if (
+        not expected_state
+        or returned_state != expected_state
+    ):
+        return "Invalid or expired Google authorization.", 400
+
+    client_id = os.environ.get(
+        "GOOGLE_OAUTH_CLIENT_ID"
+    )
+    client_secret = os.environ.get(
+        "GOOGLE_OAUTH_CLIENT_SECRET"
+    )
+    redirect_uri = os.environ.get(
+        "GOOGLE_OAUTH_REDIRECT_URI"
+    )
+
+    if not client_id or not client_secret or not redirect_uri:
+        return "Google OAuth configuration is missing.", 500
+
+    token_request_data = urlencode({
+        "code": authorization_code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }).encode("utf-8")
+
+    token_request = Request(
+        "https://oauth2.googleapis.com/token",
+        data=token_request_data,
+        headers={
+            "Content-Type": (
+                "application/x-www-form-urlencoded"
+            )
+        },
+        method="POST"
+    )
+
+    try:
+        with urlopen(token_request, timeout=15) as response:
+            token_data = json.loads(
+                response.read().decode("utf-8")
+            )
+    except Exception as e:
+        print("Google token exchange failed:", e)
+        return "Google token exchange failed.", 500
+
+    refresh_token = token_data.get("refresh_token")
+
+    if not refresh_token:
+        return (
+            "Google did not return a refresh token. "
+            "Please start the connection again.",
+            400
+        )
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO automation_state (key, value)
+                VALUES ('google_refresh_token', %s)
+                ON CONFLICT (key)
+                DO UPDATE SET value = EXCLUDED.value
+            """, (refresh_token,))
+
+            cur.execute("""
+                DELETE FROM automation_state
+                WHERE key = 'google_oauth_state'
+            """)
+
+        conn.commit()
+
+    return render_template_string("""
+        <!doctype html>
+        <html>
+        <head>
+            <title>Google Connected</title>
+        </head>
+        <body style="
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 60px auto;
+        ">
+            <h1>Google Business Profile Connected</h1>
+            <p>
+                Authorization was completed successfully.
+            </p>
+            <p>
+                You may now return to the SMS dashboard.
+            </p>
+            <p>
+                <a href="/dashboard">Open dashboard</a>
+            </p>
+        </body>
+        </html>
+    """)
+
 @app.route("/google/connect", methods=["GET"])
 def google_connect():
     auth_response = require_dashboard_auth()
