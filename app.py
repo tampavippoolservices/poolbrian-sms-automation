@@ -877,6 +877,54 @@ def incoming_sms():
     to_number = request.form.get("To")
     message_body = request.form.get("Body", "")
 
+    opt_out_type = (
+        request.form.get("OptOutType")
+        or ""
+    ).strip().upper()
+
+    normalized_body = message_body.strip().upper()
+
+    sms_opt_out_keywords = {
+        "STOP",
+        "STOPALL",
+        "UNSUBSCRIBE",
+        "CANCEL",
+        "END",
+        "QUIT",
+        "REVOKE",
+        "OPTOUT"
+    }
+
+    sms_opt_in_keywords = {
+        "START",
+        "UNSTOP",
+        "YES"
+    }
+
+    if (
+        opt_out_type == "STOP"
+        or normalized_body in sms_opt_out_keywords
+    ):
+        save_communication_preference(
+            "sms",
+            from_number,
+            True,
+            "customer_opt_out",
+            "twilio_inbound"
+        )
+
+    elif (
+        opt_out_type == "START"
+        or normalized_body in sms_opt_in_keywords
+    ):
+        save_communication_preference(
+            "sms",
+            from_number,
+            False,
+            "customer_opt_in",
+            "twilio_inbound"
+        )
+
     customer_name = "Unknown customer"
 
     try:
