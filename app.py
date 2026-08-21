@@ -25,6 +25,7 @@ from communication_preferences import (
     save_communication_preference
 )
 from twilio_service import send_sms
+from google_service import get_google_access_token
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
