@@ -510,23 +510,38 @@ def mark_baseline_complete():
 
         conn.commit()
 
-
-def send_sms(to_number, message_body, message_type="general"):
+def send_sms(
+    to_number,
+    message_body,
+    message_type="general",
+    reference_id=None
+):
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
-    status_callback = os.environ.get("TWILIO_STATUS_CALLBACK_URL")
+    status_callback = os.environ.get(
+        "TWILIO_STATUS_CALLBACK_URL"
+    )
 
     client = Client(account_sid, auth_token)
 
     callback_url = status_callback
 
     if status_callback:
+        callback_params = {
+            "message_type": message_type
+        }
+
+        if reference_id is not None:
+            callback_params["reference_id"] = str(
+                reference_id
+            )
+
         separator = "&" if "?" in status_callback else "?"
         callback_url = (
             status_callback
             + separator
-            + urlencode({"message_type": message_type})
+            + urlencode(callback_params)
         )
 
     message = client.messages.create(
