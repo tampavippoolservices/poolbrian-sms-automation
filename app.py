@@ -1693,7 +1693,7 @@ def poolbrain_webhook():
                                 "no_phone"
                             )
 
-    continue
+                        continue
 
                         message_body = (
                             f"Hi {customer_name}, your pool technician noticed that "
@@ -1723,7 +1723,7 @@ def poolbrain_webhook():
                             )
                         
                             continue
-                        )
+                        
 
                         save_processed_alert(
                             alert_id,
