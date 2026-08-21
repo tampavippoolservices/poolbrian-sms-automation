@@ -909,10 +909,17 @@ def incoming_sms():
         "YES"
     }
 
-    if (
+    is_sms_opt_out = (
         opt_out_type == "STOP"
         or normalized_body in sms_opt_out_keywords
-    ):
+    )
+
+    is_sms_opt_in = (
+        opt_out_type == "START"
+        or normalized_body in sms_opt_in_keywords
+    )
+
+    if is_sms_opt_out:
         save_communication_preference(
             "sms",
             from_number,
@@ -921,9 +928,14 @@ def incoming_sms():
             "twilio_inbound"
         )
 
-    elif (
-        opt_out_type == "START"
-        or normalized_body in sms_opt_in_keywords
+    elif is_sms_opt_in:
+        save_communication_preference(
+            "sms",
+            from_number,
+            False,
+            "customer_opt_in",
+            "twilio_inbound"
+        )
     ):
         save_communication_preference(
             "sms",
@@ -1007,7 +1019,14 @@ def incoming_sms():
                 UPDATE review_requests
                 SET
                     customer_replied_at = NOW(),
-                    status = 'completed',
+                    status = CASE
+                        WHEN %s THEN 'cancelled'
+                        ELSE 'completed'
+                    END,
+                    cancelled_reason = CASE
+                        WHEN %s THEN 'sms_opt_out'
+                        ELSE cancelled_reason
+                    END,
                     updated_at = NOW()
                 WHERE record_id = (
                     SELECT record_id
@@ -1028,7 +1047,11 @@ def incoming_sms():
                     ORDER BY first_sent_at DESC
                     LIMIT 1
                 )
-            """, (from_digits,))
+            """, (
+                is_sms_opt_out,
+                is_sms_opt_out,
+                from_digits
+            ))
 
         conn.commit()
 
