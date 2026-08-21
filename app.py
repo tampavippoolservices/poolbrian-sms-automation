@@ -225,7 +225,45 @@ def init_db():
 
         conn.commit()
 
+def claim_water_alert(
+    alert_id,
+    customer_id,
+    job_id
+):
+    if not alert_id:
+        return False
 
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO processed_alerts (
+                    alert_id,
+                    customer_id,
+                    job_id,
+                    alert_type,
+                    status
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    'WaterLevelLow',
+                    'processing'
+                )
+                ON CONFLICT (alert_id) DO NOTHING
+                RETURNING alert_id
+            """, (
+                alert_id,
+                customer_id,
+                job_id
+            ))
+
+            claimed_row = cur.fetchone()
+
+        conn.commit()
+
+    return claimed_row is not None
+    
 def alert_already_processed(alert_id):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
