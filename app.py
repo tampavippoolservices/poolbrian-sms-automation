@@ -2133,7 +2133,6 @@ def process_review_requests():
                 "google_review",
                 record_id
             )
-            )
 
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
