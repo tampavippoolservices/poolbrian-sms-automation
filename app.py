@@ -2,7 +2,7 @@ from flask import (
     Flask,
     request,
     jsonify,
-    render_template_string,
+    render_template_string,Completed-service suppression active.
     Response,
     redirect
 )
@@ -2066,6 +2066,19 @@ def poolbrain_webhook():
 
                         continue
 
+                        if communication_is_suppressed(
+                            "sms",
+                            customer_phone
+                        ):
+                            save_processed_alert(
+                                alert_id,
+                                customer_id,
+                                job_id,
+                                "WaterLevelLow",
+                                "sms_suppressed"
+                            )
+                            continue
+                        
                         message_body = (
                             f"Hi {customer_name}, your pool technician noticed that "
                             f"your pool water level is low. Please add water to the "
