@@ -1764,24 +1764,24 @@ def process_completed_services():
         )
 
         try:
-    sid = send_sms(
-        customer_phone,
-        message_body,
-        "completed_service"
-    )
-except Exception as e:
-    print(
-        f"Completed service SMS failed for "
-        f"record {record_id}: {e}"
-    )
-
-    save_processed_job(
-        record_id,
-        customer_id,
-        "send_failed"
-    )
-
-    continue
+            sid = send_sms(
+                customer_phone,
+                message_body,
+                "completed_service"
+            )
+        except Exception as e:
+            print(
+                f"Completed service SMS failed for "
+                f"record {record_id}: {e}"
+            )
+        
+            save_processed_job(
+                record_id,
+                customer_id,
+                "send_failed"
+            )
+        
+            continue
 
         save_processed_job(
             record_id,
