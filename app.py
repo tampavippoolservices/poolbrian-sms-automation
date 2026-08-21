@@ -1992,19 +1992,30 @@ def process_review_requests():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT
-                    record_id,
-                    customer_id,
-                    customer_phone,
-                    review_token
-                FROM review_requests
-                WHERE status = 'queued'
-                AND scheduled_for <= NOW()
-                ORDER BY scheduled_for ASC
-                LIMIT 50
+               WITH due AS (
+                    SELECT record_id
+                    FROM review_requests
+                    WHERE status = 'queued'
+                    AND scheduled_for <= NOW()
+                    ORDER BY scheduled_for ASC
+                    LIMIT 50
+                    FOR UPDATE SKIP LOCKED
+                )
+                UPDATE review_requests AS review
+                SET
+                    status = 'sending',
+                    updated_at = NOW()
+                FROM due
+                WHERE review.record_id = due.record_id
+                RETURNING
+                    review.record_id,
+                    review.customer_id,
+                    review.customer_phone,
+                    review.review_token
             """)
 
             due_requests = cur.fetchall()
+            conn.commit()
 
     sent_count = 0
     failed_count = 0
@@ -2047,7 +2058,7 @@ def process_review_requests():
                             cancelled_reason = 'no_phone',
                             updated_at = NOW()
                         WHERE record_id = %s
-                        AND status = 'queued'
+                        AND status = 'sending'
                     """, (record_id,))
 
                 conn.commit()
@@ -2080,7 +2091,7 @@ def process_review_requests():
                             first_sent_at = NOW(),
                             updated_at = NOW()
                         WHERE record_id = %s
-                        AND status = 'queued'
+                        AND status = 'sending'
                     """, (
                         sid,
                         record_id
@@ -2110,7 +2121,7 @@ def process_review_requests():
                             cancelled_reason = %s,
                             updated_at = NOW()
                         WHERE record_id = %s
-                        AND status = 'queued'
+                        AND status = 'sending'
                     """, (
                         str(e)[:500],
                         record_id
