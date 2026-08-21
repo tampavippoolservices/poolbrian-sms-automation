@@ -203,6 +203,16 @@ def init_db():
             """)
 
             cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS first_delivery_status TEXT
+            """)
+            
+            cur.execute("""
+                ALTER TABLE review_requests
+                ADD COLUMN IF NOT EXISTS first_delivery_updated_at TIMESTAMPTZ
+            """)
+            
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS google_reviews (
                     google_review_id TEXT PRIMARY KEY,
                     reviewer_name TEXT,
