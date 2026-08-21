@@ -80,20 +80,6 @@ def claim_water_alert(
     return claimed_row is not None
     
 
-def alert_already_processed(alert_id):
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT status
-                FROM processed_alerts
-                WHERE alert_id = %s
-            """, (alert_id,))
-
-            row = cur.fetchone()
-
-            return row is not None
-
-
 def save_processed_alert(
     alert_id,
     customer_id,
@@ -159,24 +145,6 @@ def claim_completed_job(
 
     return claimed_row is not None
 
-def job_already_processed(record_id):
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT status
-                FROM processed_jobs
-                WHERE record_id = %s
-            """, (record_id,))
-
-            row = cur.fetchone()
-
-            if not row:
-                return False
-
-            return row[0] in (
-                "baseline",
-                "text_sent"
-            )
 
 
 def save_processed_job(
