@@ -2183,7 +2183,7 @@ def poolbrain_webhook():
                                 "no_phone"
                             )
 
-                        continue
+                            continue
 
                         if communication_is_suppressed(
                             "sms",
