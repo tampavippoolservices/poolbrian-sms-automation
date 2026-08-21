@@ -212,7 +212,7 @@ def init_db():
                 ADD COLUMN IF NOT EXISTS first_delivery_updated_at TIMESTAMPTZ
             """)
 
-                        cur.execute("""
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS
                 communication_suppressions (
                     channel TEXT NOT NULL
