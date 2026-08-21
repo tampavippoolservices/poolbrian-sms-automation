@@ -24,6 +24,7 @@ from communication_preferences import (
     normalize_communication_destination,
     save_communication_preference
 )
+from twilio_service import send_sms
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
