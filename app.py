@@ -840,18 +840,18 @@ def twilio_status():
     error_code = request.form.get("ErrorCode")
     destination_number = request.form.get("To")
     message_type = request.args.get("message_type", "general")
-        reference_id = request.args.get("reference_id")
-        review_record_id = None
+    reference_id = request.args.get("reference_id")
+    review_record_id = None
     
-        if reference_id:
-            try:
-                review_record_id = int(reference_id)
+    if reference_id:
+        try:
+            review_record_id = int(reference_id)
     
-                if review_record_id <= 0:
-                    review_record_id = None
-    
-            except (TypeError, ValueError):
+            if review_record_id <= 0:
                 review_record_id = None
+    
+        except (TypeError, ValueError):
+            review_record_id = None
 
     print(
         "Twilio status update:",
