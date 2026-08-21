@@ -646,16 +646,22 @@ def get_customer(customer_id):
     return None
 
 
-def get_completed_jobs_today():
-    today = datetime.now(
+def get_recent_completed_jobs():
+    now = datetime.now(
         ZoneInfo("America/New_York")
+    )
+
+    from_date = (
+        now - timedelta(days=1)
     ).strftime("%Y-%m-%d")
+
+    to_date = now.strftime("%Y-%m-%d")
 
     result = poolbrain_get(
         "/v2/route_stops_job_list",
         {
-            "fromDate": today,
-            "toDate": today
+            "fromDate": from_date,
+            "toDate": to_date
         }
     )
 
@@ -1761,7 +1767,7 @@ def process_completed_services():
 
     init_db()
 
-    completed_jobs = get_completed_jobs_today()
+    completed_jobs = get_recent_completed_jobs()
 
     if not baseline_is_complete():
         count = 0
