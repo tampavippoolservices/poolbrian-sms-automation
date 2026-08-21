@@ -2130,7 +2130,9 @@ def process_review_requests():
             sid = send_sms(
                 customer_phone,
                 message_body,
-                "google_review"
+                "google_review",
+                record_id
+            )
             )
 
             with get_db_connection() as conn:
