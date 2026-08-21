@@ -3,7 +3,6 @@ from flask import (
     request,
     jsonify,
     render_template_string,
-    Response,
     redirect
 )
 from security import (
@@ -12,7 +11,6 @@ from security import (
     valid_twilio_request
 )
 from twilio.rest import Client
-from twilio.request_validator import RequestValidator
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -27,66 +25,6 @@ import hashlib
 
 app = Flask(__name__)
 
-def check_dashboard_auth():
-    username = os.environ.get("DASHBOARD_USERNAME")
-    password = os.environ.get("DASHBOARD_PASSWORD")
-
-    auth = request.authorization
-
-    return (
-        auth is not None
-        and auth.username == username
-        and auth.password == password
-    )
-
-
-def require_dashboard_auth():
-    if check_dashboard_auth():
-        return None
-
-    return Response(
-        "Login required",
-        401,
-        {
-            "WWW-Authenticate": 'Basic realm="Tampa VIP SMS Dashboard"'
-        }
-    )
-def valid_twilio_request():
-    auth_token = os.environ.get(
-        "TWILIO_AUTH_TOKEN"
-    )
-    signature = request.headers.get(
-        "X-Twilio-Signature",
-        ""
-    )
-    public_base_url = os.environ.get(
-        "PUBLIC_BASE_URL"
-    )
-
-    if (
-        not auth_token
-        or not signature
-        or not public_base_url
-    ):
-        return False
-
-    requested_path = request.full_path
-
-    if requested_path.endswith("?"):
-        requested_path = requested_path[:-1]
-
-    validation_url = (
-        public_base_url.rstrip("/")
-        + requested_path
-    )
-
-    validator = RequestValidator(auth_token)
-
-    return validator.validate(
-        validation_url,
-        request.form,
-        signature
-    )
     
 POOLBRAIN_BASE_URL = "https://prodapi.poolbrain.com"
 
