@@ -1652,8 +1652,29 @@ def poolbrain_webhook():
                     alert_text = alert_name.lower()
 
                     if alert_name == "WaterLevelLow":
-                        alert_id = alert.get("alertId")
-
+                        raw_alert_id = alert.get("alertId")
+                        
+                        try:
+                            alert_id = int(raw_alert_id)
+                            customer_id = int(customer_id)
+                        
+                            if job_id is not None:
+                                job_id = int(job_id)
+                        
+                        except (TypeError, ValueError):
+                            print(
+                                "Skipped Water Level Low alert "
+                                "with invalid identifiers."
+                            )
+                            continue
+                        
+                        if alert_id <= 0 or customer_id <= 0:
+                            print(
+                                "Skipped Water Level Low alert "
+                                "with non-positive identifiers."
+                            )
+                            continue
+                        
                         print("WATER LEVEL LOW DETECTED")
                         print(f"CustomerId: {customer_id}")
                         print(f"JobID: {job_id}")
