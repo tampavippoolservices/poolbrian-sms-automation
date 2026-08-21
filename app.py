@@ -1725,7 +1725,10 @@ def process_completed_services():
         if not record_id or not customer_id:
             continue
 
-        if job_already_processed(record_id):
+        if not claim_completed_job(
+            record_id,
+            customer_id
+        ):
             skipped_count += 1
             continue
 
@@ -1760,11 +1763,25 @@ def process_completed_services():
             f"https://tampavippoolservices.poolbrain.com"
         )
 
-        sid = send_sms(
-    customer_phone,
-    message_body,
-    "completed_service"
-        )
+        try:
+    sid = send_sms(
+        customer_phone,
+        message_body,
+        "completed_service"
+    )
+except Exception as e:
+    print(
+        f"Completed service SMS failed for "
+        f"record {record_id}: {e}"
+    )
+
+    save_processed_job(
+        record_id,
+        customer_id,
+        "send_failed"
+    )
+
+    continue
 
         save_processed_job(
             record_id,
