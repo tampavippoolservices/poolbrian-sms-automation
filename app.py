@@ -19,6 +19,11 @@ from database import (
     get_db_connection,
     init_db
 )
+from communication_preferences import (
+    communication_is_suppressed,
+    normalize_communication_destination,
+    save_communication_preference
+)
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
