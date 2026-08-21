@@ -15,6 +15,10 @@ from poolbrain_service import (
     get_recent_completed_jobs,
     poolbrain_get
 )
+from database import (
+    get_db_connection,
+    init_db
+)
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
