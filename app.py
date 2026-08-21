@@ -279,6 +279,32 @@ def save_processed_alert(
 
         conn.commit()
 
+def claim_completed_job(
+    record_id,
+    customer_id
+):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO processed_jobs (
+                    record_id,
+                    customer_id,
+                    status
+                )
+                VALUES (%s, %s, 'processing')
+                ON CONFLICT (record_id) DO NOTHING
+                RETURNING record_id
+            """, (
+                record_id,
+                customer_id
+            ))
+
+            claimed_row = cur.fetchone()
+
+        conn.commit()
+
+    return claimed_row is not None
+
 def job_already_processed(record_id):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
