@@ -848,7 +848,79 @@ def get_customer(customer_id):
 
     return None
 
+def backfill_missing_customer_names(limit=20):
+    safe_limit = max(1, min(int(limit), 50))
 
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT customer_id
+                FROM review_requests
+                WHERE customer_id IS NOT NULL
+                AND (
+                    customer_name IS NULL
+                    OR BTRIM(customer_name) = ''
+                )
+                ORDER BY customer_id
+                LIMIT %s
+            """, (safe_limit,))
+
+            customer_rows = cur.fetchall()
+
+    updated_rows = 0
+    failed_customers = 0
+
+    for customer_row in customer_rows:
+        customer_id = customer_row[0]
+
+        try:
+            customer = get_customer(customer_id)
+
+            customer_name = (
+                (customer or {})
+                .get("CustomerName", "")
+                .strip()
+            )
+
+            if not customer_name:
+                failed_customers += 1
+                continue
+
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            customer_name = %s,
+                            updated_at = NOW()
+                        WHERE customer_id = %s
+                        AND (
+                            customer_name IS NULL
+                            OR BTRIM(customer_name) = ''
+                        )
+                    """, (
+                        customer_name,
+                        customer_id
+                    ))
+
+                    updated_rows += cur.rowcount
+
+                conn.commit()
+
+        except Exception as error:
+            failed_customers += 1
+            print(
+                "Customer-name backfill failed:",
+                customer_id,
+                error
+            )
+
+    return {
+        "customers_checked": len(customer_rows),
+        "rows_updated": updated_rows,
+        "customers_failed": failed_customers
+    }
+    
 def get_recent_completed_jobs():
     now = datetime.now(
         ZoneInfo("America/New_York")
