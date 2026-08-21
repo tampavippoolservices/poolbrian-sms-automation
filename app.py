@@ -1381,7 +1381,7 @@ def dashboard():
             cur.execute("""
                 SELECT COUNT(*)
                 FROM sms_delivery_status
-                WHERE updated_at::date =
+                WHERE (updated_at AT TIME ZONE 'America/New_York')::date =
                     (NOW() AT TIME ZONE 'America/New_York')::date
             """)
             total_today = cur.fetchone()[0]
@@ -1390,7 +1390,7 @@ def dashboard():
                 SELECT COUNT(*)
                 FROM sms_delivery_status
                 WHERE message_status = 'delivered'
-                AND updated_at::date =
+                AND (updated_at AT TIME ZONE 'America/New_York')::date =
                     (NOW() AT TIME ZONE 'America/New_York')::date
             """)
             delivered_today = cur.fetchone()[0]
@@ -1399,7 +1399,7 @@ def dashboard():
                 SELECT COUNT(*)
                 FROM sms_delivery_status
                 WHERE message_status IN ('failed', 'undelivered')
-                AND updated_at::date =
+                AND (updated_at AT TIME ZONE 'America/New_York')::date =
                     (NOW() AT TIME ZONE 'America/New_York')::date
             """)
             failed_today = cur.fetchone()[0]
