@@ -2154,7 +2154,7 @@ def review_queue_status():
             cur.execute("""
                 SELECT COUNT(*)
                 FROM review_requests
-                WHERE status = 'first_sent'
+                WHERE first_sent_at IS NOT NULL
             """)
             sent_count = cur.fetchone()[0]
 
