@@ -686,6 +686,14 @@ def send_sms(
     message_type="general",
     reference_id=None
 ):
+    if communication_is_suppressed(
+        "sms",
+        to_number
+    ):
+        raise ValueError(
+            "SMS delivery suppressed for recipient"
+        ) 
+    
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_PHONE_NUMBER")
