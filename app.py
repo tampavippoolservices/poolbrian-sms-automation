@@ -10,6 +10,11 @@ from security import (
     valid_poolbrain_webhook,
     valid_twilio_request
 )
+from poolbrain_service import (
+    get_customer,
+    get_recent_completed_jobs,
+    poolbrain_get
+)
 from twilio.rest import Client
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
