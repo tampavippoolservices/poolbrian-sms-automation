@@ -211,6 +211,27 @@ def init_db():
                 ALTER TABLE review_requests
                 ADD COLUMN IF NOT EXISTS first_delivery_updated_at TIMESTAMPTZ
             """)
+
+                        cur.execute("""
+                CREATE TABLE IF NOT EXISTS
+                communication_suppressions (
+                    channel TEXT NOT NULL
+                        CHECK (channel IN ('sms', 'email')),
+                    destination TEXT NOT NULL,
+                    is_suppressed BOOLEAN NOT NULL
+                        DEFAULT TRUE,
+                    reason TEXT,
+                    source TEXT,
+                    suppressed_at TIMESTAMPTZ
+                        DEFAULT NOW(),
+                    resumed_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ
+                        DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ
+                        DEFAULT NOW(),
+                    PRIMARY KEY (channel, destination)
+                )
+            """)
             
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS google_reviews (
