@@ -928,6 +928,65 @@ def twilio_status():
             ))
 
             if (
+                message_type == "google_review"
+                and review_record_id is not None
+            ):
+                delivery_failure = message_status in (
+                    "failed",
+                    "undelivered"
+                )
+
+                failure_reason = None
+
+                if delivery_failure:
+                    failure_reason = (
+                        f"twilio_{message_status}"
+                        + (
+                            f"_error_{error_code}"
+                            if error_code
+                            else ""
+                        )
+                    )
+
+                cur.execute("""
+                    UPDATE review_requests
+                    SET
+                        first_message_sid = COALESCE(
+                            first_message_sid,
+                            %s
+                        ),
+                        first_delivery_status = %s,
+                        first_delivery_updated_at = NOW(),
+                        status = CASE
+                            WHEN %s
+                            AND status IN (
+                                'sending',
+                                'first_sent'
+                            )
+                                THEN 'send_failed'
+                            ELSE status
+                        END,
+                        cancelled_reason = CASE
+                            WHEN %s
+                            AND status IN (
+                                'sending',
+                                'first_sent'
+                            )
+                                THEN %s
+                            ELSE cancelled_reason
+                        END,
+                        updated_at = NOW()
+                    WHERE record_id = %s
+                """, (
+                    message_sid,
+                    message_status,
+                    delivery_failure,
+                    delivery_failure,
+                    failure_reason,
+                    review_record_id
+                ))
+
+            if (
                 message_status in ("failed", "undelivered")
                 and not already_alerted
             ):
