@@ -1655,8 +1655,15 @@ def poolbrain_webhook():
 
                         init_db()
 
-                        if alert_already_processed(alert_id):
-                            print(f"Water Level Low alert {alert_id} already processed")
+                        if not claim_water_alert(
+                            alert_id,
+                            customer_id,
+                            job_id
+                        ):
+                            print(
+                                f"Water Level Low alert {alert_id} "
+                                f"was already claimed or is invalid."
+                            )
                             continue
 
                         customer = get_customer(customer_id)
@@ -1673,8 +1680,20 @@ def poolbrain_webhook():
                         customer_phone = customer.get("Phone")
 
                         if not customer_phone:
-                            print(f"No phone number for customer {customer_id}")
-                            continue
+                            print(
+                                f"No phone number for customer "
+                                f"{customer_id}"
+                            )
+                        
+                            save_processed_alert(
+                                alert_id,
+                                customer_id,
+                                job_id,
+                                "WaterLevelLow",
+                                "no_phone"
+                            )
+
+    continue
 
                         message_body = (
                             f"Hi {customer_name}, your pool technician noticed that "
@@ -1683,10 +1702,27 @@ def poolbrain_webhook():
                             f"Tampa VIP Pool Services"
                         )
 
-                        sid = send_sms(
-                            customer_phone,
-                            message_body,
-                            "water_level_low"
+                        try:
+                            sid = send_sms(
+                                customer_phone,
+                                message_body,
+                                "water_level_low"
+                            )
+                        except Exception as e:
+                            print(
+                                f"Water Level Low SMS failed for "
+                                f"alert {alert_id}: {e}"
+                            )
+                        
+                            save_processed_alert(
+                                alert_id,
+                                customer_id,
+                                job_id,
+                                "WaterLevelLow",
+                                "send_failed"
+                            )
+                        
+                            continue
                         )
 
                         save_processed_alert(
