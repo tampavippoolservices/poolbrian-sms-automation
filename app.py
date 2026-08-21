@@ -1047,11 +1047,11 @@ def incoming_sms():
                     ORDER BY first_sent_at DESC
                     LIMIT 1
                 )
-            """, (
-                is_sms_opt_out,
-                is_sms_opt_out,
-                from_digits
-            ))
+                """, (
+                    is_sms_opt_out,
+                    is_sms_opt_out,
+                    from_digits
+                ))
 
         conn.commit()
 
