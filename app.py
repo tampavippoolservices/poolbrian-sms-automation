@@ -1688,7 +1688,54 @@ def google_connect():
     )
 
     return redirect(authorization_url)
+@app.route(
+    "/backfill-review-customer-names",
+    methods=["POST"]
+)
+def run_customer_name_backfill():
+    provided_secret = request.headers.get(
+        "X-Process-Secret"
+    )
+    expected_secret = os.environ.get(
+        "PROCESS_SECRET"
+    )
 
+    if (
+        not expected_secret
+        or provided_secret != expected_secret
+    ):
+        return "Unauthorized", 401
+
+    try:
+        limit = int(
+            request.args.get("limit", "20")
+        )
+
+    except (TypeError, ValueError):
+        return jsonify({
+            "success": False,
+            "message": "The limit must be a number."
+        }), 400
+
+    if limit < 1 or limit > 50:
+        return jsonify({
+            "success": False,
+            "message": (
+                "The limit must be between 1 and 50."
+            )
+        }), 400
+
+    init_db()
+
+    result = backfill_missing_customer_names(
+        limit
+    )
+
+    return jsonify({
+        "success": True,
+        **result
+    }), 200
+    
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     auth_response = require_dashboard_auth()
