@@ -1008,13 +1008,7 @@ def incoming_sms():
             "customer_opt_in",
             "twilio_inbound"
         )
-        save_communication_preference(
-            "sms",
-            from_number,
-            False,
-            "customer_opt_in",
-            "twilio_inbound"
-        )
+        
 
     customer_name = "Unknown customer"
 
