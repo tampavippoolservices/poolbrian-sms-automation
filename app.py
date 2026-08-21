@@ -2415,6 +2415,28 @@ def process_review_requests():
             failed_count += 1
             continue
 
+        if communication_is_suppressed(
+            "sms",
+            customer_phone
+        ):
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE review_requests
+                        SET
+                            status = 'cancelled',
+                            cancelled_reason =
+                                'sms_opt_out',
+                            updated_at = NOW()
+                        WHERE record_id = %s
+                        AND status = 'sending'
+                    """, (record_id,))
+
+                conn.commit()
+
+            failed_count += 1
+            continue
+        
         message_body = (
             "Hi, thank you for choosing Tampa VIP Pool Services!\n\n"
             "We would appreciate your honest feedback on Google:\n\n"
