@@ -2202,6 +2202,19 @@ def process_completed_services():
             )
             continue
 
+        if communication_is_suppressed(
+            "sms",
+            customer_phone
+        ):
+            save_processed_job(
+                record_id,
+                customer_id,
+                "sms_suppressed"
+            )
+
+            skipped_count += 1
+            continue
+        
         message_body = (
             f"Hi {customer_name}, your pool service has been completed. "
             f"You can view your detailed service report here: "
