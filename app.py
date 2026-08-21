@@ -1422,7 +1422,7 @@ def dashboard():
             cur.execute("""
                 SELECT COUNT(*)
                 FROM review_requests
-                WHERE status = 'first_sent'
+                WHERE first_sent_at IS NOT NULL
             """)
             reviews_sent = cur.fetchone()[0]
             
