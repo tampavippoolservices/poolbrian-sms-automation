@@ -53,6 +53,7 @@ class AppConfig:
     MESSAGE_MAX_ATTEMPTS: int
     MESSAGE_LEASE_MINUTES: int
     GOOGLE_SYNC_ENABLED: bool
+    OUTLOOK_SEND_ENABLED: bool
     OUTLOOK_BOUNCE_SYNC_ENABLED: bool
 
     @classmethod
@@ -80,6 +81,7 @@ class AppConfig:
             MESSAGE_MAX_ATTEMPTS=_integer("MESSAGE_MAX_ATTEMPTS", 5, 1, 20),
             MESSAGE_LEASE_MINUTES=_integer("MESSAGE_LEASE_MINUTES", 10, 1, 120),
             GOOGLE_SYNC_ENABLED=_boolean("GOOGLE_SYNC_ENABLED"),
+            OUTLOOK_SEND_ENABLED=_boolean("OUTLOOK_SEND_ENABLED"),
             OUTLOOK_BOUNCE_SYNC_ENABLED=_boolean("OUTLOOK_BOUNCE_SYNC_ENABLED"),
         )
         config.validate()

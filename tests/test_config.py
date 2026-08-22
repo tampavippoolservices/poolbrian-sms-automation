@@ -9,6 +9,7 @@ def test_development_defaults_are_valid(monkeypatch: pytest.MonkeyPatch) -> None
     assert config.BUSINESS_TIMEZONE == "America/New_York"
     assert config.REVIEW_SMS_DELAY_HOURS == 3
     assert config.GOOGLE_SYNC_ENABLED is False
+    assert config.OUTLOOK_SEND_ENABLED is False
 
 
 def test_production_refuses_weak_secrets(monkeypatch: pytest.MonkeyPatch) -> None:

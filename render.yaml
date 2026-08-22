@@ -77,6 +77,8 @@ services:
         sync: false
       - key: MICROSOFT_WEBHOOK_CLIENT_STATE
         generateValue: true
+      - key: OUTLOOK_SEND_ENABLED
+        value: "false"
       - key: OUTLOOK_BOUNCE_SYNC_ENABLED
         value: "false"
       - key: SENTRY_DSN

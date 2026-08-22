@@ -64,8 +64,10 @@ https://<host>/auth/callback
 
 8. Trigger `process-all` manually. Expect zero historical customer sends and a successful heartbeat.
 9. Enable the new five-minute worker cron. Confirm two consecutive successful runs.
-10. Connect Outlook from the dashboard, send to a controlled address, verify the multipart email and
-    unsubscribe confirmation, set `OUTLOOK_BOUNCE_SYNC_ENABLED=true`, then verify the bounce cron.
+10. Connect Outlook from the dashboard, send to a controlled address, and verify the multipart email
+    and unsubscribe confirmation. Then set `OUTLOOK_SEND_ENABLED=true` and
+    `OUTLOOK_BOUNCE_SYNC_ENABLED=true`, and verify the worker and bounce cron. Until send is enabled,
+    scheduled email jobs remain queued and are not claimed.
 11. When Google approval is active, connect Google, test the connection, run one review sync, and then
     set `GOOGLE_SYNC_ENABLED=true` and verify its cron. Until those flags are enabled, both cron jobs
     exit successfully as disabled instead of producing incident noise.
