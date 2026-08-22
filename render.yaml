@@ -9,7 +9,7 @@ services:
     name: poolbrain-sms-automation-v2
     runtime: python
     plan: starter
-    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps --no-build-isolation .
+    buildCommand: pip install --require-hashes -r requirements.lock
     preDeployCommand: alembic upgrade head
     startCommand: gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 30 --error-logfile -
     healthCheckPath: /health/ready
@@ -92,7 +92,7 @@ services:
     name: tampa-vip-automation-worker
     runtime: python
     schedule: "*/5 * * * *"
-    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps --no-build-isolation .
+    buildCommand: pip install --require-hashes -r requirements.lock
     startCommand: python -m app.cli process-all
     envVars: *sharedEnv
 
@@ -100,7 +100,7 @@ services:
     name: tampa-vip-google-review-sync
     runtime: python
     schedule: "17 */6 * * *"
-    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps --no-build-isolation .
+    buildCommand: pip install --require-hashes -r requirements.lock
     startCommand: python -m app.cli sync-google-reviews
     envVars: *sharedEnv
 
@@ -108,7 +108,7 @@ services:
     name: tampa-vip-outlook-bounce-sync
     runtime: python
     schedule: "43 * * * *"
-    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps --no-build-isolation .
+    buildCommand: pip install --require-hashes -r requirements.lock
     startCommand: python -m app.cli sync-outlook-bounces
     envVars: *sharedEnv
 
@@ -116,6 +116,6 @@ services:
     name: tampa-vip-retention-cleanup
     runtime: python
     schedule: "12 7 * * *"
-    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps --no-build-isolation .
+    buildCommand: pip install --require-hashes -r requirements.lock
     startCommand: python -m app.cli retention-cleanup
     envVars: *sharedEnv
