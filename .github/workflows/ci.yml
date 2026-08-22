@@ -37,8 +37,8 @@ jobs:
       PUBLIC_BASE_URL: https://automation.example.com
       TOKEN_ENCRYPTION_KEY: YTmyeGG4aJ9iil9X2FwgVVqoUXE55aC1e0c7Om0eL88=
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -63,8 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
