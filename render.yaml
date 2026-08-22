@@ -1,0 +1,121 @@
+databases:
+  - name: tampa-vip-automation-db
+    databaseName: tampa_vip_automation
+    user: tampa_vip_automation
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: poolbrain-sms-automation-v2
+    runtime: python
+    plan: starter
+    buildCommand: pip install --require-hashes -r requirements.lock
+    preDeployCommand: alembic upgrade head
+    startCommand: gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 30 --error-logfile -
+    healthCheckPath: /health/ready
+    autoDeployTrigger: checksPass
+    envVars: &sharedEnv
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tampa-vip-automation-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ADMIN_AUTH_MODE
+        value: oidc
+      - key: ADMIN_ALLOWED_EMAILS
+        sync: false
+      - key: ADMIN_ALLOWED_DOMAIN
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: POOLBRAIN_API_KEY
+        sync: false
+      - key: POOLBRAIN_WEBHOOK_SIGNING_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: COMPANY_PHONE_NUMBER
+        sync: false
+      - key: ALERT_PHONE_NUMBER
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_REVIEW_URL
+        sync: false
+      - key: GOOGLE_ACCOUNT_ID
+        sync: false
+      - key: GOOGLE_LOCATION_ID
+        sync: false
+      - key: GOOGLE_SYNC_ENABLED
+        value: "false"
+      - key: MICROSOFT_TENANT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_OAUTH_REDIRECT_URI
+        sync: false
+      - key: OUTLOOK_SENDER_ADDRESS
+        sync: false
+      - key: MICROSOFT_ADMIN_REDIRECT_URI
+        sync: false
+      - key: MICROSOFT_WEBHOOK_CLIENT_STATE
+        generateValue: true
+      - key: OUTLOOK_BOUNCE_SYNC_ENABLED
+        value: "false"
+      - key: SENTRY_DSN
+        sync: false
+      - key: MESSAGE_CONTENT_RETENTION_DAYS
+        value: 90
+      - key: OPERATIONAL_EVENT_RETENTION_DAYS
+        value: 365
+      - key: AUDIT_RETENTION_DAYS
+        value: 730
+
+  - type: cron
+    name: tampa-vip-automation-worker
+    runtime: python
+    schedule: "*/5 * * * *"
+    buildCommand: pip install --require-hashes -r requirements.lock
+    startCommand: python -m app.cli process-all
+    envVars: *sharedEnv
+
+  - type: cron
+    name: tampa-vip-google-review-sync
+    runtime: python
+    schedule: "17 */6 * * *"
+    buildCommand: pip install --require-hashes -r requirements.lock
+    startCommand: python -m app.cli sync-google-reviews
+    envVars: *sharedEnv
+
+  - type: cron
+    name: tampa-vip-outlook-bounce-sync
+    runtime: python
+    schedule: "43 * * * *"
+    buildCommand: pip install --require-hashes -r requirements.lock
+    startCommand: python -m app.cli sync-outlook-bounces
+    envVars: *sharedEnv
+
+  - type: cron
+    name: tampa-vip-retention-cleanup
+    runtime: python
+    schedule: "12 7 * * *"
+    buildCommand: pip install --require-hashes -r requirements.lock
+    startCommand: python -m app.cli retention-cleanup
+    envVars: *sharedEnv
