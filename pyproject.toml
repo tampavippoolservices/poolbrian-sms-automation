@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tampa-vip-automation"
+version = "2.0.0"
+description = "Reliable PoolBrain, Twilio, Google review, and Outlook automation"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "alembic>=1.14,<2",
+  "authlib>=1.4,<2",
+  "cryptography>=50,<51",
+  "flask>=3.1,<4",
+  "gunicorn>=23,<24",
+  "psycopg[binary,pool]>=3.2,<4",
+  "requests>=2.32,<3",
+  "sentry-sdk[flask]>=2.20,<3",
+  "sqlalchemy>=2.0,<3",
+  "twilio>=9.4,<10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2,<2",
+  "mypy>=1.14,<2",
+  "pip-audit>=2.8,<3",
+  "pip-tools>=7.4,<8",
+  "pre-commit>=4.1,<5",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+  "responses>=0.25,<1",
+  "ruff>=0.9,<1",
+  "types-requests>=2.32,<3",
+]
+
+[project.scripts]
+tampa-vip-automation = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*", "migrations*"]
+
+[tool.setuptools.package-data]
+app = ["templates/*.html"]
+migrations = ["script.py.mako"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = ["integration: requires a PostgreSQL test database"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["twilio.*"]
+ignore_missing_imports = true
