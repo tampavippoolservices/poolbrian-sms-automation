@@ -554,13 +554,14 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
             ]
         )
     if within_local_hours(now, config.BUSINESS_TIMEZONE, 9, 19):
-        kinds.extend(
-            [
-                "initial_review_sms",
-                "next_day_review_email",
-                "saturday_review_email",
-            ]
-        )
+        kinds.append("initial_review_sms")
+        if config.OUTLOOK_SEND_ENABLED:
+            kinds.extend(
+                [
+                    "next_day_review_email",
+                    "saturday_review_email",
+                ]
+            )
     return kinds
 
 

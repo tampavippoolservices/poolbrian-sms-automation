@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import cast
 
 from app import workers
@@ -30,3 +31,24 @@ def test_process_all_continues_after_independent_step_failure(monkeypatch) -> No
     assert result["success"] is False
     assert result["errors"] == {"completed_services": "RuntimeError"}
     assert result["messages"] == {"accepted": 1}
+
+
+def test_email_jobs_require_outlook_send_flag(monkeypatch) -> None:
+    monkeypatch.setattr(workers, "within_local_hours", lambda *_args: True)
+    disabled = SimpleNamespace(
+        BUSINESS_TIMEZONE="America/New_York",
+        OUTLOOK_SEND_ENABLED=False,
+    )
+    enabled = SimpleNamespace(
+        BUSINESS_TIMEZONE="America/New_York",
+        OUTLOOK_SEND_ENABLED=True,
+    )
+
+    disabled_kinds = workers._allowed_message_kinds(cast(AppConfig, disabled))
+    enabled_kinds = workers._allowed_message_kinds(cast(AppConfig, enabled))
+
+    assert "initial_review_sms" in disabled_kinds
+    assert "next_day_review_email" not in disabled_kinds
+    assert "saturday_review_email" not in disabled_kinds
+    assert "next_day_review_email" in enabled_kinds
+    assert "saturday_review_email" in enabled_kinds
