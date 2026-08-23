@@ -1,115 +1,222 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Tampa VIP Automation Dashboard</title>
-  <style>
-    :root { --ink:#172033; --muted:#667085; --blue:#1267d6; --red:#b42318; --green:#067647; --line:#e4e7ec; --bg:#f6f8fb; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--ink); }
-    header { background:#0c2c55; color:white; padding:20px 28px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-    header h1 { margin:0; font-size:22px; }
-    header small { opacity:.8; }
-    main { max-width:1400px; margin:0 auto; padding:28px; }
-    h2 { margin-top:36px; }
-    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
-    .card { background:white; border:1px solid var(--line); border-radius:10px; padding:18px; }
-    .number { font-size:30px; font-weight:800; margin-top:8px; }
-    .muted { color:var(--muted); }
-    .warning { color:var(--red); font-weight:700; }
-    .ok { color:var(--green); font-weight:700; }
-    .table-wrap { overflow:auto; background:white; border:1px solid var(--line); border-radius:10px; }
-    table { width:100%; border-collapse:collapse; min-width:900px; }
-    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
-    th { background:#f9fafb; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:#475467; }
-    tr:last-child td { border-bottom:0; }
-    .pill { border-radius:999px; padding:3px 9px; background:#eef4ff; white-space:nowrap; display:inline-block; }
-    form.inline { display:inline-flex; gap:6px; align-items:center; margin:2px; }
-    input { min-height:34px; border:1px solid #b8c0cc; border-radius:5px; padding:6px 8px; }
-    button { min-height:34px; border:0; border-radius:5px; background:var(--blue); color:white; padding:6px 11px; font-weight:700; cursor:pointer; }
-    button.danger { background:var(--red); }
-    button.secondary { background:#475467; }
-    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0 24px; }
-    @media(max-width:700px){ header,main{padding:18px} header{align-items:flex-start;flex-direction:column} }
-  </style>
-</head>
-<body>
-<header>
-  <div><h1>Tampa VIP Automation</h1><small>Operational dashboard · signed in as {{ identity or "administrator" }}</small></div>
-  {% if auth_mode == "oidc" %}
-  <form method="post" action="/auth/logout">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button class="secondary" type="submit">Sign out</button>
-  </form>
-  {% endif %}
+{% extends "base.html" %}
+
+{% block title %}Operations Dashboard | Tampa VIP Pool Services{% endblock %}
+
+{% block body %}
+{% set needs_attention = metrics.failed_today or metrics.delivery_unknown or metrics.oldest_due_minutes|float > 15 %}
+<header class="brand-header">
+  <div class="brand-header__inner">
+    <div class="brand-lockup">
+      <div class="brand-logo-frame">
+        <img class="brand-logo" src="{{ url_for('static', filename='images/tampa-vip-logo.jpeg') }}" alt="Tampa VIP Pool Services">
+      </div>
+      <div>
+        <p class="brand-kicker">Tampa VIP Pool Services</p>
+        <h1 class="brand-title">Automation Control Center</h1>
+        <p class="brand-subtitle">Customer communication and review operations</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="system-status{% if needs_attention %} system-status--attention{% endif %}">
+        {% if needs_attention %}Needs attention{% else %}Operating normally{% endif %}
+      </span>
+      {% if auth_mode == "oidc" %}
+      <form method="post" action="/auth/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="secondary" type="submit">Sign out</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
 </header>
-<main>
-  <div class="toolbar">
-    <form method="post" action="/google/connect"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Connect Google</button></form>
-    <form method="post" action="/microsoft/connect"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Connect Outlook</button></form>
+
+<main class="dashboard-shell" id="main-content">
+  <div class="dashboard-intro">
+    <div>
+      <p class="eyebrow">Operations overview</p>
+      <h2>Welcome back</h2>
+      <p>Monitor customer messages, review campaigns, provider connections, and worker health from one place. Signed in as {{ identity or "administrator" }}.</p>
+    </div>
+    <div class="toolbar" aria-label="Provider connections">
+      <form method="post" action="/google/connect">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit"><span aria-hidden="true">G</span> Connect Google</button>
+      </form>
+      <form method="post" action="/microsoft/connect">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="secondary" type="submit"><span aria-hidden="true">M</span> Connect Outlook</button>
+      </form>
+    </div>
   </div>
 
-  <section class="cards">
-    <div class="card"><div class="muted">Messages created today</div><div class="number">{{ metrics.messages_today }}</div></div>
-    <div class="card"><div class="muted">Delivered today</div><div class="number">{{ metrics.delivered_today }}</div></div>
-    <div class="card"><div class="muted">Failed today</div><div class="number">{{ metrics.failed_today }}</div></div>
-    <div class="card"><div class="muted">Queued / retrying</div><div class="number">{{ metrics.queued }}</div></div>
-    <div class="card"><div class="muted">Due now</div><div class="number">{{ metrics.due }}</div></div>
-    <div class="card"><div class="muted">Delivery uncertain</div><div class="number {% if metrics.delivery_unknown %}warning{% endif %}">{{ metrics.delivery_unknown }}</div></div>
+  <section aria-labelledby="message-overview-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="message-overview-heading">Message activity</h2>
+        <p>Today’s delivery totals and current queue health.</p>
+      </div>
+    </div>
+    <div class="metric-grid">
+      <article class="metric-card"><div class="metric-label">Messages created today</div><div class="metric-number">{{ metrics.messages_today }}</div></article>
+      <article class="metric-card metric-card--success"><div class="metric-label">Delivered today</div><div class="metric-number">{{ metrics.delivered_today }}</div></article>
+      <article class="metric-card metric-card--danger"><div class="metric-label">Failed today</div><div class="metric-number{% if metrics.failed_today %} metric-number--danger{% endif %}">{{ metrics.failed_today }}</div></article>
+      <article class="metric-card"><div class="metric-label">Queued or retrying</div><div class="metric-number">{{ metrics.queued }}</div></article>
+      <article class="metric-card metric-card--warning"><div class="metric-label">Due now</div><div class="metric-number">{{ metrics.due }}</div></article>
+      <article class="metric-card metric-card--warning"><div class="metric-label">Delivery uncertain</div><div class="metric-number{% if metrics.delivery_unknown %} metric-number--danger{% endif %}">{{ metrics.delivery_unknown }}</div></article>
+    </div>
+    {% if metrics.oldest_due_minutes|float > 15 %}
+    <p class="notice" role="alert"><span aria-hidden="true">!</span> Oldest due message is {{ metrics.oldest_due_minutes|round|int }} minutes late.</p>
+    {% endif %}
   </section>
-  {% if metrics.oldest_due_minutes|float > 15 %}<p class="warning">Oldest due message is {{ metrics.oldest_due_minutes|round|int }} minutes late.</p>{% endif %}
 
-  <h2>Review campaigns</h2>
-  <section class="cards">
-    <div class="card"><div class="muted">Active</div><div class="number">{{ campaign_metrics.active }}</div></div>
-    <div class="card"><div class="muted">Clicked</div><div class="number">{{ campaign_metrics.clicked }}</div></div>
-    <div class="card"><div class="muted">Confirmed</div><div class="number">{{ campaign_metrics.confirmed }}</div></div>
-    <div class="card"><div class="muted">Customer replied</div><div class="number">{{ campaign_metrics.replied }}</div></div>
-    <div class="card"><div class="muted">SMS suppressed</div><div class="number">{{ communication.sms_suppressed }}</div></div>
-    <div class="card"><div class="muted">Email suppressed</div><div class="number">{{ communication.email_suppressed }}</div></div>
+  <section class="section-block" aria-labelledby="campaign-overview-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="campaign-overview-heading">Review campaigns</h2>
+        <p>Customer engagement and communication preferences.</p>
+      </div>
+    </div>
+    <div class="metric-grid">
+      <article class="metric-card"><div class="metric-label">Active campaigns</div><div class="metric-number">{{ campaign_metrics.active }}</div></article>
+      <article class="metric-card"><div class="metric-label">Review links clicked</div><div class="metric-number">{{ campaign_metrics.clicked }}</div></article>
+      <article class="metric-card metric-card--success"><div class="metric-label">Reviews confirmed</div><div class="metric-number">{{ campaign_metrics.confirmed }}</div></article>
+      <article class="metric-card"><div class="metric-label">Customers replied</div><div class="metric-number">{{ campaign_metrics.replied }}</div></article>
+      <article class="metric-card"><div class="metric-label">SMS suppressed</div><div class="metric-number">{{ communication.sms_suppressed }}</div></article>
+      <article class="metric-card"><div class="metric-label">Email suppressed</div><div class="metric-number">{{ communication.email_suppressed }}</div></article>
+    </div>
   </section>
 
-  <h2>Recent message jobs</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>ID</th><th>Channel</th><th>Type</th><th>Destination</th><th>Status</th><th>Provider</th><th>Attempts</th><th>Scheduled</th><th>Action</th></tr></thead>
-    <tbody>{% for row in recent_jobs %}<tr>
-      <td>{{ row.id }}</td><td>{{ row.channel }}</td><td>{{ row.message_kind }}</td><td>{{ row.destination_masked }}</td>
-      <td><span class="pill">{{ row.status }}</span>{% if row.last_error_code %}<br><small class="warning">{{ row.last_error_code }}</small>{% endif %}</td>
-      <td>{{ row.provider_status or "—" }}</td><td>{{ row.attempt_count }}</td><td>{{ format_time(row.scheduled_at) }}</td>
-      <td>{% if row.status in ("failed","dead") %}<form class="inline" method="post" action="/admin/message-jobs/{{ row.id }}/retry"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Retry</button></form>{% else %}—{% endif %}</td>
-    </tr>{% else %}<tr><td colspan="9">No messages yet.</td></tr>{% endfor %}</tbody>
-  </table></div>
+  <section class="section-block" aria-labelledby="message-jobs-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="message-jobs-heading">Recent message jobs</h2>
+        <p>Latest SMS and email delivery attempts.</p>
+      </div>
+    </div>
+    <div class="table-wrap" role="region" aria-label="Recent message jobs" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">ID</th><th scope="col">Channel</th><th scope="col">Type</th><th scope="col">Destination</th><th scope="col">Status</th><th scope="col">Provider</th><th scope="col">Attempts</th><th scope="col">Scheduled</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+        {% for row in recent_jobs %}
+          <tr>
+            <td>{{ row.id }}</td>
+            <td>{{ row.channel }}</td>
+            <td>{{ row.message_kind }}</td>
+            <td>{{ row.destination_masked }}</td>
+            <td><span class="status-badge status-badge--{{ row.status|lower|replace('_', '-') }}">{{ row.status|replace('_', ' ') }}</span>{% if row.last_error_code %}<br><small class="text-warning">{{ row.last_error_code }}</small>{% endif %}</td>
+            <td>{{ row.provider_status or "—" }}</td>
+            <td>{{ row.attempt_count }}</td>
+            <td>{{ format_time(row.scheduled_at) }}</td>
+            <td>{% if row.status in ("failed", "dead") %}<form class="table-form" method="post" action="/admin/message-jobs/{{ row.id }}/retry"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Retry</button></form>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td class="empty-state" colspan="9">No message jobs have been created yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-  <h2>Recent review campaigns</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th>Created</th><th>Clicked</th><th>Confirmed</th><th>Action</th></tr></thead>
-    <tbody>{% for row in campaigns %}<tr>
-      <td>{{ row.customer_name or "Unknown" }}{% if row.google_reviewer_name %}<br><small>Google: {{ row.google_reviewer_name }}</small>{% endif %}</td>
-      <td>{{ row.phone_masked }}<br>{{ row.email_masked }}</td><td><span class="pill">{{ row.status }}</span></td>
-      <td>{{ format_time(row.created_at) }}</td><td>{{ format_time(row.clicked_at) }}</td><td>{{ format_time(row.confirmed_at) }}</td>
-      <td>{% if row.status != "confirmed" %}
-        <form class="inline" method="post" action="/admin/campaigns/{{ row.id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input required maxlength="120" name="reviewer_name" placeholder="Google reviewer name"><button type="submit">Confirm</button></form>
-        {% if row.status == "active" %}<form class="inline" method="post" action="/admin/campaigns/{{ row.id }}/cancel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input name="reason" maxlength="250" placeholder="Reason"><button class="danger" type="submit">Cancel</button></form>{% endif %}
-      {% else %}<form class="inline" method="post" action="/admin/campaigns/{{ row.id }}/undo-confirmation"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="secondary" type="submit">Undo</button></form>{% endif %}</td>
-    </tr>{% else %}<tr><td colspan="7">No campaigns yet.</td></tr>{% endfor %}</tbody>
-  </table></div>
+  <section class="section-block" aria-labelledby="campaigns-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="campaigns-heading">Recent review campaigns</h2>
+        <p>Track requests, customer engagement, and confirmations.</p>
+      </div>
+    </div>
+    <div class="table-wrap" role="region" aria-label="Recent review campaigns" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Clicked</th><th scope="col">Confirmed</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+        {% for row in campaigns %}
+          <tr>
+            <td>{{ row.customer_name or "Unknown" }}{% if row.google_reviewer_name %}<br><small class="text-muted">Google: {{ row.google_reviewer_name }}</small>{% endif %}</td>
+            <td>{{ row.phone_masked }}<br>{{ row.email_masked }}</td>
+            <td><span class="status-badge status-badge--{{ row.status|lower|replace('_', '-') }}">{{ row.status|replace('_', ' ') }}</span></td>
+            <td>{{ format_time(row.created_at) }}</td>
+            <td>{{ format_time(row.clicked_at) }}</td>
+            <td>{{ format_time(row.confirmed_at) }}</td>
+            <td>
+              {% if row.status != "confirmed" %}
+              <form class="table-form" method="post" action="/admin/campaigns/{{ row.id }}/confirm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input required maxlength="120" name="reviewer_name" aria-label="Google reviewer name for {{ row.customer_name or 'customer' }}" placeholder="Google reviewer name">
+                <button type="submit">Confirm</button>
+              </form>
+              {% if row.status == "active" %}
+              <form class="table-form" method="post" action="/admin/campaigns/{{ row.id }}/cancel">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input name="reason" maxlength="250" aria-label="Cancellation reason for {{ row.customer_name or 'customer' }}" placeholder="Reason">
+                <button class="danger" type="submit">Cancel</button>
+              </form>
+              {% endif %}
+              {% else %}
+              <form class="table-form" method="post" action="/admin/campaigns/{{ row.id }}/undo-confirmation">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="secondary" type="submit">Undo</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td class="empty-state" colspan="7">No review campaigns have been created yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-  <h2>Google reviews needing attention</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Reviewer</th><th>Rating</th><th>Created</th><th>Match</th><th>Campaign</th><th>Action</th></tr></thead>
-    <tbody>{% for row in reviews %}<tr>
-      <td>{{ row.reviewer_name or "Anonymous" }}</td><td>{{ row.star_rating or "—" }}</td><td>{{ format_time(row.review_created_at) }}</td><td>{{ row.match_status }}{% if row.match_confidence %} ({{ (row.match_confidence * 100)|round|int }}%){% endif %}</td><td>{{ row.campaign_id or "—" }}</td>
-      <td>{% if row.campaign_id %}<form class="inline" method="post" action="/admin/campaigns/{{ row.campaign_id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="reviewer_name" value="{{ row.reviewer_name or 'Anonymous' }}"><input type="hidden" name="google_review_id" value="{{ row.google_review_id }}"><button type="submit">Approve match</button></form>{% else %}—{% endif %}</td>
-    </tr>{% else %}<tr><td colspan="6">No unmatched reviews.</td></tr>{% endfor %}</tbody>
-  </table></div>
+  <section class="section-block" aria-labelledby="google-reviews-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="google-reviews-heading">Google reviews needing attention</h2>
+        <p>Review and approve suggested campaign matches.</p>
+      </div>
+    </div>
+    <div class="table-wrap" role="region" aria-label="Google reviews needing attention" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Reviewer</th><th scope="col">Rating</th><th scope="col">Created</th><th scope="col">Match</th><th scope="col">Campaign</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+        {% for row in reviews %}
+          <tr>
+            <td>{{ row.reviewer_name or "Anonymous" }}</td>
+            <td>{{ row.star_rating or "—" }}</td>
+            <td>{{ format_time(row.review_created_at) }}</td>
+            <td><span class="status-badge">{{ row.match_status|replace('_', ' ') }}</span>{% if row.match_confidence %} <span class="text-muted">({{ (row.match_confidence * 100)|round|int }}%)</span>{% endif %}</td>
+            <td>{{ row.campaign_id or "—" }}</td>
+            <td>{% if row.campaign_id %}<form class="table-form" method="post" action="/admin/campaigns/{{ row.campaign_id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="reviewer_name" value="{{ row.reviewer_name or 'Anonymous' }}"><input type="hidden" name="google_review_id" value="{{ row.google_review_id }}"><button type="submit">Approve match</button></form>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td class="empty-state" colspan="6">No Google reviews currently need attention.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-  <h2>Worker health</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Worker</th><th>Last start</th><th>Last success</th><th>Last failure</th><th>Error</th></tr></thead>
-    <tbody>{% for row in heartbeats %}<tr><td>{{ row.worker_name }}</td><td>{{ format_time(row.last_started_at) }}</td><td>{{ format_time(row.last_succeeded_at) }}</td><td>{{ format_time(row.last_failed_at) }}</td><td>{{ row.last_error or "—" }}</td></tr>{% else %}<tr><td colspan="5">No worker heartbeats yet.</td></tr>{% endfor %}</tbody>
-  </table></div>
+  <section class="section-block" aria-labelledby="worker-health-heading">
+    <div class="section-heading">
+      <div>
+        <h2 id="worker-health-heading">Worker health</h2>
+        <p>Background automation activity and recent failures.</p>
+      </div>
+    </div>
+    <div class="table-wrap" role="region" aria-label="Worker health" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Worker</th><th scope="col">Last start</th><th scope="col">Last success</th><th scope="col">Last failure</th><th scope="col">Error</th></tr></thead>
+        <tbody>
+        {% for row in heartbeats %}
+          <tr><td>{{ row.worker_name }}</td><td>{{ format_time(row.last_started_at) }}</td><td>{{ format_time(row.last_succeeded_at) }}</td><td>{{ format_time(row.last_failed_at) }}</td><td>{{ row.last_error or "—" }}</td></tr>
+        {% else %}
+          <tr><td class="empty-state" colspan="5">No worker heartbeats have been recorded yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </main>
-</body>
-</html>
 
+<footer class="site-footer">
+  Tampa VIP Pool Services · Internal operations dashboard
+</footer>
+{% endblock %}

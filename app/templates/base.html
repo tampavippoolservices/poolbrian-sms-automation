@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b2451">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{% block title %}Tampa VIP Pool Services{% endblock %}</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='images/favicon.jpeg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  {% block body %}{% endblock %}
+</body>
+</html>

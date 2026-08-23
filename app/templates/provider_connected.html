@@ -1,21 +1,22 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ provider }} connected</title>
-  <style>
-    body { font-family: Arial, sans-serif; background:#f5f7fb; color:#172033; margin:0; }
-    main { max-width:640px; margin:64px auto; background:white; padding:32px; border-radius:12px; }
-    a { color:#1267d6; font-weight:700; }
-  </style>
-</head>
-<body>
-<main>
-  <h1>{{ provider }} connected</h1>
-  <p>Authorization completed successfully. The encrypted refresh credential is ready for background workers.</p>
-  <p><a href="{{ dashboard_url }}">Return to dashboard</a></p>
-</main>
-</body>
-</html>
+{% extends "base.html" %}
 
+{% block title %}{{ provider }} Connected | Tampa VIP Pool Services{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block body %}
+<main class="public-shell" id="main-content">
+  <aside class="public-brand-panel" aria-label="Tampa VIP Pool Services">
+    <img class="public-logo" src="{{ url_for('static', filename='images/tampa-vip-logo-badge.jpeg') }}" alt="Tampa VIP Pool Services">
+    <p class="public-brand-copy">Professional pool care and reliable customer communication.</p>
+  </aside>
+  <section class="public-card">
+    <div class="success-mark" aria-hidden="true">✓</div>
+    <p class="eyebrow">Connection successful</p>
+    <h1>{{ provider }} connected</h1>
+    <p>Authorization is complete. The encrypted refresh credential is ready for the background automation.</p>
+    <div class="public-actions">
+      <a class="button button--large" href="{{ dashboard_url }}">Return to dashboard</a>
+    </div>
+  </section>
+</main>
+{% endblock %}
