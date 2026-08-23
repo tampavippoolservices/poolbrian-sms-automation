@@ -1,29 +1,29 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Email preferences | Tampa VIP Pool Services</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f5f7fb; color: #172033; margin: 0; }
-    main { max-width: 560px; margin: 64px auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 8px 30px rgba(18, 40, 80, .08); }
-    button { background: #b42318; color: white; border: 0; border-radius: 6px; padding: 12px 18px; font-weight: 700; cursor: pointer; }
-  </style>
-</head>
-<body>
-<main>
-  {% if completed %}
-    <h1>You are unsubscribed</h1>
-    <p>We will no longer send review-request emails to this address.</p>
-  {% else %}
-    <h1>Unsubscribe from review emails?</h1>
-    <p>This only stops review-request emails. It does not change essential service communication preferences.</p>
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button type="submit">Unsubscribe</button>
-    </form>
-  {% endif %}
-</main>
-</body>
-</html>
+{% extends "base.html" %}
 
+{% block title %}Email Preferences | Tampa VIP Pool Services{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block body %}
+<main class="public-shell" id="main-content">
+  <aside class="public-brand-panel" aria-label="Tampa VIP Pool Services">
+    <img class="public-logo" src="{{ url_for('static', filename='images/tampa-vip-logo-badge.jpeg') }}" alt="Tampa VIP Pool Services">
+    <p class="public-brand-copy">Professional pool care and thoughtful customer communication.</p>
+  </aside>
+  <section class="public-card">
+    {% if completed %}
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <p class="eyebrow">Preference saved</p>
+      <h1>You are unsubscribed</h1>
+      <p>We will no longer send review-request emails to this address. Essential service communications are not affected.</p>
+    {% else %}
+      <p class="eyebrow">Email preferences</p>
+      <h1>Unsubscribe from review emails?</h1>
+      <p>This only stops review-request emails. It does not change essential service communication preferences.</p>
+      <form class="public-actions" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="danger button--large" type="submit">Unsubscribe from review emails</button>
+      </form>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

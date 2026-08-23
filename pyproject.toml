@@ -43,7 +43,7 @@ tampa-vip-automation = "app.cli:main"
 include = ["app*", "migrations*"]
 
 [tool.setuptools.package-data]
-app = ["templates/*.html"]
+app = ["templates/*.html", "static/css/*.css", "static/images/*.jpeg"]
 migrations = ["script.py.mako"]
 
 [tool.pytest.ini_options]

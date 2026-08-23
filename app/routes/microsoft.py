@@ -5,7 +5,7 @@ import os
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session
 
 from app.repositories.oauth import consume_oauth_state, create_oauth_state, save_refresh_token
-from app.security import admin_identity, require_admin, validate_csrf
+from app.security import admin_identity, csrf_token, require_admin, validate_csrf
 from app.services.microsoft import MICROSOFT_SCOPES, MicrosoftGraphClient
 
 microsoft_bp = Blueprint("microsoft", __name__)
@@ -16,6 +16,14 @@ ADMIN_SCOPES = "openid profile email User.Read"
 def admin_login():
     if current_app.config.get("ADMIN_AUTH_MODE") != "oidc":
         return redirect("/admin/dashboard")
+    return render_template("login.html", csrf_token=csrf_token())
+
+
+@microsoft_bp.post("/auth/login")
+def admin_login_start():
+    if current_app.config.get("ADMIN_AUTH_MODE") != "oidc":
+        return redirect("/admin/dashboard")
+    validate_csrf()
     redirect_uri = os.getenv("MICROSOFT_ADMIN_REDIRECT_URI", "").strip()
     if not redirect_uri:
         abort(503, "MICROSOFT_ADMIN_REDIRECT_URI is not configured")

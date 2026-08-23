@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Administrator Sign In | Tampa VIP Pool Services{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block body %}
+<main class="public-shell" id="main-content">
+  <aside class="public-brand-panel" aria-label="Tampa VIP Pool Services">
+    <img class="public-logo" src="{{ url_for('static', filename='images/tampa-vip-logo-badge.jpeg') }}" alt="Tampa VIP Pool Services">
+    <p class="public-brand-copy">Secure access to customer communication and review operations.</p>
+  </aside>
+  <section class="public-card">
+    <p class="eyebrow">Secure administration</p>
+    <h1>Welcome back</h1>
+    <p>Sign in with your authorized Microsoft account to open the Tampa VIP automation dashboard.</p>
+    <form class="public-actions" method="post" action="/auth/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="button--large" type="submit">Continue with Microsoft</button>
+    </form>
+  </section>
+</main>
+{% endblock %}
