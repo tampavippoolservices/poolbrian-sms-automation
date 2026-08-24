@@ -379,6 +379,45 @@ button.danger:hover { background: #8f1d15; }
   font-weight: 700;
 }
 
+.table-controls {
+  display: flex;
+  margin-bottom: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.table-search {
+  display: flex;
+  min-width: min(520px, 100%);
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-search label {
+  color: #53657b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.table-search__fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-search__fields input[type="search"] {
+  width: min(360px, 100%);
+}
+
+.table-results {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--line);
@@ -423,6 +462,47 @@ td {
 
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover td { background: var(--brand-blue-50); }
+
+.pagination {
+  display: flex;
+  margin-top: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.pagination a,
+.pagination > span {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 7px 11px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c7d4e0;
+  border-radius: var(--radius-sm);
+  color: var(--brand-navy-800);
+  background: white;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  border-color: var(--brand-blue-600);
+  color: var(--brand-blue-700);
+  background: var(--brand-blue-50);
+}
+
+.pagination > span[aria-disabled="true"] {
+  color: #96a2b1;
+  background: #f4f7fa;
+}
+
+.pagination .pagination__status {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
 
 .empty-state {
   padding: 30px;
@@ -652,6 +732,26 @@ input::placeholder { color: #7d8999; }
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .table-controls,
+  .table-search__fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-search { min-width: 100%; }
+  .table-search__fields input[type="search"] { width: 100%; }
+  .table-results { margin-bottom: 0; }
+
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pagination .pagination__status {
+    width: 100%;
+    order: -1;
   }
 
   .table-form {
