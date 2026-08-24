@@ -2,6 +2,47 @@
 
 {% block title %}Operations Dashboard | Tampa VIP Pool Services{% endblock %}
 
+{% macro table_controls(pager, label, placeholder) %}
+<div class="table-controls">
+  <form class="table-search" method="get" action="/admin/dashboard#{{ pager.anchor }}" role="search">
+    {% for name, value in dashboard_filters.items() %}
+      {% if name != pager.query_name and name != pager.page_name %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+      {% endif %}
+    {% endfor %}
+    <label for="{{ pager.query_name }}">Search {{ label }}</label>
+    <div class="table-search__fields">
+      <input id="{{ pager.query_name }}" type="search" name="{{ pager.query_name }}" value="{{ pager.search }}" maxlength="100" placeholder="{{ placeholder }}">
+      <button type="submit">Search</button>
+      {% if pager.search %}<a class="button button--secondary" href="{{ pager.clear_url }}">Clear</a>{% endif %}
+    </div>
+  </form>
+  <p class="table-results" aria-live="polite">
+    {% if pager.total %}Showing {{ pager.first_item }}–{{ pager.last_item }} of {{ pager.total }}{% else %}No matching entries{% endif %}
+  </p>
+</div>
+{% endmacro %}
+
+{% macro table_pagination(pager, label) %}
+{% if pager.pages > 1 %}
+<nav class="pagination" aria-label="{{ label }} pagination">
+  {% if pager.page > 1 %}
+  <a href="{{ pager.first_url }}" aria-label="First page">First</a>
+  <a href="{{ pager.previous_url }}" rel="prev">Previous</a>
+  {% else %}
+  <span aria-disabled="true">First</span><span aria-disabled="true">Previous</span>
+  {% endif %}
+  <span class="pagination__status">Page {{ pager.page }} of {{ pager.pages }}</span>
+  {% if pager.page < pager.pages %}
+  <a href="{{ pager.next_url }}" rel="next">Next</a>
+  <a href="{{ pager.last_url }}" aria-label="Last page">Last</a>
+  {% else %}
+  <span aria-disabled="true">Next</span><span aria-disabled="true">Last</span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
 {% block body %}
 {% set needs_attention = metrics.failed_today or metrics.delivery_unknown or metrics.oldest_due_minutes|float > 15 %}
 <header class="brand-header">
@@ -89,10 +130,11 @@
   <section class="section-block" aria-labelledby="message-jobs-heading">
     <div class="section-heading">
       <div>
-        <h2 id="message-jobs-heading">Recent message jobs</h2>
-        <p>Latest SMS and email delivery attempts.</p>
+        <h2 id="message-jobs-heading">Message jobs</h2>
+        <p>Search and browse all SMS and email delivery attempts.</p>
       </div>
     </div>
+    {{ table_controls(pagination.jobs, "message jobs", "ID, status, type, destination…") }}
     <div class="table-wrap" role="region" aria-label="Recent message jobs" tabindex="0">
       <table>
         <thead><tr><th scope="col">ID</th><th scope="col">Channel</th><th scope="col">Type</th><th scope="col">Destination</th><th scope="col">Status</th><th scope="col">Provider</th><th scope="col">Attempts</th><th scope="col">Scheduled</th><th scope="col">Action</th></tr></thead>
@@ -115,15 +157,17 @@
         </tbody>
       </table>
     </div>
+    {{ table_pagination(pagination.jobs, "Message jobs") }}
   </section>
 
   <section class="section-block" aria-labelledby="campaigns-heading">
     <div class="section-heading">
       <div>
-        <h2 id="campaigns-heading">Recent review campaigns</h2>
-        <p>Track requests, customer engagement, and confirmations.</p>
+        <h2 id="campaigns-heading">Review campaigns</h2>
+        <p>Search and browse all requests, engagement, and confirmations.</p>
       </div>
     </div>
+    {{ table_controls(pagination.campaigns, "review campaigns", "Customer, status, phone, email…") }}
     <div class="table-wrap" role="region" aria-label="Recent review campaigns" tabindex="0">
       <table>
         <thead><tr><th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Clicked</th><th scope="col">Confirmed</th><th scope="col">Action</th></tr></thead>
@@ -164,6 +208,7 @@
         </tbody>
       </table>
     </div>
+    {{ table_pagination(pagination.campaigns, "Review campaigns") }}
   </section>
 
   <section class="section-block" aria-labelledby="google-reviews-heading">
@@ -173,6 +218,7 @@
         <p>Review and approve suggested campaign matches.</p>
       </div>
     </div>
+    {{ table_controls(pagination.reviews, "Google reviews", "Reviewer, rating, match, campaign…") }}
     <div class="table-wrap" role="region" aria-label="Google reviews needing attention" tabindex="0">
       <table>
         <thead><tr><th scope="col">Reviewer</th><th scope="col">Rating</th><th scope="col">Created</th><th scope="col">Match</th><th scope="col">Campaign</th><th scope="col">Action</th></tr></thead>
@@ -192,6 +238,7 @@
         </tbody>
       </table>
     </div>
+    {{ table_pagination(pagination.reviews, "Google reviews") }}
   </section>
 
   <section class="section-block" aria-labelledby="worker-health-heading">
@@ -201,6 +248,7 @@
         <p>Background automation activity and recent failures.</p>
       </div>
     </div>
+    {{ table_controls(pagination.workers, "worker health", "Worker name or error…") }}
     <div class="table-wrap" role="region" aria-label="Worker health" tabindex="0">
       <table>
         <thead><tr><th scope="col">Worker</th><th scope="col">Last start</th><th scope="col">Last success</th><th scope="col">Last failure</th><th scope="col">Error</th></tr></thead>
@@ -213,6 +261,7 @@
         </tbody>
       </table>
     </div>
+    {{ table_pagination(pagination.workers, "Worker health") }}
   </section>
 </main>
 

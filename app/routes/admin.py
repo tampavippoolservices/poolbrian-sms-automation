@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request
@@ -20,20 +21,90 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 @require_admin
 def dashboard():
     timezone_name = str(current_app.config["BUSINESS_TIMEZONE"])
-    snapshot = dashboard_snapshot(timezone_name)
+    filters: dict[str, str | int] = {
+        "jobs_page": _page_argument("jobs_page"),
+        "jobs_q": _search_argument("jobs_q"),
+        "campaigns_page": _page_argument("campaigns_page"),
+        "campaigns_q": _search_argument("campaigns_q"),
+        "reviews_page": _page_argument("reviews_page"),
+        "reviews_q": _search_argument("reviews_q"),
+        "workers_page": _page_argument("workers_page"),
+        "workers_q": _search_argument("workers_q"),
+    }
+    snapshot = dashboard_snapshot(
+        timezone_name,
+        jobs_page=int(filters["jobs_page"]),
+        jobs_search=str(filters["jobs_q"]),
+        campaigns_page=int(filters["campaigns_page"]),
+        campaigns_search=str(filters["campaigns_q"]),
+        reviews_page=int(filters["reviews_page"]),
+        reviews_search=str(filters["reviews_q"]),
+        workers_page=int(filters["workers_page"]),
+        workers_search=str(filters["workers_q"]),
+    )
     for row in snapshot["recent_jobs"]:
         row["destination_masked"] = masked_destination(row.pop("destination_normalized", None))
     for row in snapshot["campaigns"]:
         row["phone_masked"] = masked_destination(row.pop("phone_e164", None))
         row["email_masked"] = masked_destination(row.pop("email_normalized", None))
+    table_parameters = {
+        "jobs": ("jobs_page", "jobs_q", "message-jobs-heading"),
+        "campaigns": ("campaigns_page", "campaigns_q", "campaigns-heading"),
+        "reviews": ("reviews_page", "reviews_q", "google-reviews-heading"),
+        "workers": ("workers_page", "workers_q", "worker-health-heading"),
+    }
+    for table_name, (page_name, query_name, anchor) in table_parameters.items():
+        page_data = snapshot["pagination"][table_name]
+        page = int(page_data["page"])
+        pages = int(page_data["pages"])
+        page_data.update(
+            {
+                "page_name": page_name,
+                "query_name": query_name,
+                "anchor": anchor,
+                "first_url": _dashboard_page_url(filters, page_name, 1, anchor),
+                "previous_url": (
+                    _dashboard_page_url(filters, page_name, page - 1, anchor) if page > 1 else None
+                ),
+                "next_url": (
+                    _dashboard_page_url(filters, page_name, page + 1, anchor)
+                    if page < pages
+                    else None
+                ),
+                "last_url": _dashboard_page_url(filters, page_name, pages, anchor),
+                "clear_url": _dashboard_page_url({**filters, query_name: ""}, page_name, 1, anchor),
+            }
+        )
     return render_template(
         "dashboard.html",
         **snapshot,
+        dashboard_filters=filters,
         csrf_token=csrf_token(),
         identity=admin_identity(),
         auth_mode=current_app.config["ADMIN_AUTH_MODE"],
         format_time=lambda value: _format_time(value, timezone_name),
     )
+
+
+def _page_argument(name: str) -> int:
+    try:
+        return min(max(int(request.args.get(name, "1")), 1), 1_000_000)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _search_argument(name: str) -> str:
+    return (request.args.get(name) or "").strip()[:100]
+
+
+def _dashboard_page_url(
+    filters: dict[str, str | int],
+    page_name: str,
+    page: int,
+    anchor: str,
+) -> str:
+    query = {**filters, page_name: page}
+    return f"/admin/dashboard?{urlencode(query)}#{anchor}"
 
 
 @admin_bp.post("/campaigns/<int:campaign_id>/confirm")
