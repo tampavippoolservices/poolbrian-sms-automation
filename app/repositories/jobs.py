@@ -21,7 +21,16 @@ def claim_message_jobs(
             text(
                 """
                 WITH due AS (
-                    SELECT job.id
+                    SELECT
+                        job.id,
+                        COALESCE(
+                            (
+                                SELECT MAX(attempt.attempt_number)
+                                FROM message_attempts AS attempt
+                                WHERE attempt.message_job_id = job.id
+                            ),
+                            0
+                        ) AS recorded_attempt_count
                     FROM message_jobs AS job
                     LEFT JOIN review_campaigns AS campaign ON campaign.id = job.campaign_id
                     LEFT JOIN communication_preferences AS preference
@@ -41,7 +50,10 @@ def claim_message_jobs(
                 )
                 UPDATE message_jobs AS job
                 SET status = 'leased',
-                    attempt_count = attempt_count + 1,
+                    attempt_count = GREATEST(
+                        job.attempt_count,
+                        due.recorded_attempt_count
+                    ) + 1,
                     locked_at = NOW(),
                     locked_by = :worker_id,
                     lease_expires_at = NOW() + (:lease_minutes * INTERVAL '1 minute'),
@@ -326,9 +338,12 @@ def retry_dead_or_failed_job(job_id: int) -> bool:
             text(
                 """
                 UPDATE message_jobs
-                SET status = 'queued', scheduled_at = NOW(), attempt_count = 0,
+                SET status = 'queued', scheduled_at = NOW(),
                     locked_at = NULL, locked_by = NULL, lease_expires_at = NULL,
+                    provider = NULL, provider_message_id = NULL,
+                    provider_status = NULL, provider_status_rank = 0,
                     last_error_code = NULL, last_error = NULL,
+                    accepted_at = NULL, sent_at = NULL, delivered_at = NULL,
                     failed_at = NULL, updated_at = NOW()
                 WHERE id = :job_id
                   AND status IN ('failed', 'dead')
