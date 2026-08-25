@@ -57,6 +57,46 @@ def test_completed_workflow_is_idempotent_and_schedules_all_channels() -> None:
     assert jobs["saturday_review_email"]["scheduled_at"] == datetime(2026, 8, 22, 14, 0, tzinfo=UTC)
 
 
+def test_review_campaign_is_suppressed_for_shared_email_across_customers() -> None:
+    common = {
+        "phone_e164": None,
+        "email_normalized": "shared@example.com",
+        "now": datetime(2026, 8, 20, 16, 0, tzinfo=UTC),
+        "timezone_name": "America/New_York",
+        "sms_delay_hours": 3,
+        "email_hour": 10,
+        "suppression_days": 120,
+        "max_attempts": 5,
+    }
+    first = create_completed_service_workflow(
+        source_job_id=9010,
+        customer_id=510,
+        customer_name="First Customer",
+        **common,
+    )
+    second = create_completed_service_workflow(
+        source_job_id=9011,
+        customer_id=511,
+        customer_name="Second Customer",
+        **common,
+    )
+
+    assert first["campaign_created"] is True
+    assert second == {
+        "created": True,
+        "campaign_created": False,
+        "reason": "recent_or_confirmed_campaign",
+    }
+    with transaction() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM review_campaigns")).scalar_one() == 1
+        assert (
+            connection.execute(
+                text("SELECT COUNT(*) FROM message_jobs WHERE channel = 'email'")
+            ).scalar_one()
+            == 2
+        )
+
+
 def test_suppression_is_audited_and_cancels_pending_jobs() -> None:
     create_completed_service_workflow(
         source_job_id=9002,
