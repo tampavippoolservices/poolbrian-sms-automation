@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import base64
 import os
 from dataclasses import dataclass
-from email.message import EmailMessage
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -152,20 +150,37 @@ class MicrosoftGraphClient:
         message_job_id: int,
     ) -> EmailSendResult:
         endpoint = self._mailbox_endpoint("messages")
-        message = EmailMessage()
-        message["To"] = destination
-        message["Subject"] = subject
-        message["X-Tampa-VIP-Job-ID"] = str(message_job_id)
-        if self.sender:
-            message["From"] = self.sender
-        message.set_content(text_body)
-        message.add_alternative(html_body, subtype="html")
-        encoded_message = base64.b64encode(message.as_bytes()).decode("ascii")
+        # Create a structured Graph draft instead of uploading raw MIME. Graph's
+        # MIME ingestion can preserve quoted-printable soft line breaks inside
+        # long HTML attributes, corrupting tracking and unsubscribe URLs.
+        draft_payload = {
+            "subject": subject,
+            "body": {
+                "contentType": "HTML",
+                "content": html_body,
+            },
+            "toRecipients": [
+                {
+                    "emailAddress": {
+                        "address": destination,
+                    }
+                }
+            ],
+            "internetMessageHeaders": [
+                {
+                    "name": "X-Tampa-VIP-Job-ID",
+                    "value": str(message_job_id),
+                }
+            ],
+        }
+        # Keep the text argument in the service contract for provider-neutral
+        # workers and future plain-text delivery support.
+        _ = text_body
         try:
             response = self.session.post(
                 endpoint,
-                data=encoded_message,
-                headers=self._headers(content_type="text/plain"),
+                json=draft_payload,
+                headers=self._headers(),
                 timeout=(3.05, 20),
             )
         except RequestException as exc:

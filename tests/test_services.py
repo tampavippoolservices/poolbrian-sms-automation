@@ -1,6 +1,4 @@
-import base64
-from email import policy
-from email.parser import BytesParser
+import json
 
 import pytest
 import responses
@@ -30,7 +28,7 @@ def test_google_review_pagination(monkeypatch) -> None:
 
 
 @responses.activate
-def test_microsoft_sends_multipart_draft_then_send(monkeypatch) -> None:
+def test_microsoft_sends_structured_draft_then_send(monkeypatch) -> None:
     monkeypatch.setenv("OUTLOOK_SENDER_ADDRESS", "office@example.com")
     client = MicrosoftGraphClient()
     monkeypatch.setattr(client, "access_token", lambda: "access-token")
@@ -50,10 +48,48 @@ def test_microsoft_sends_multipart_draft_then_send(monkeypatch) -> None:
     assert result.provider_status == "accepted"
     encoded = responses.calls[0].request.body
     assert isinstance(encoded, (str, bytes))
-    message = BytesParser(policy=policy.default).parsebytes(base64.b64decode(encoded))
-    assert message["X-Tampa-VIP-Job-ID"] == "42"
-    assert message.get_body(preferencelist=("plain",)).get_content().strip() == "Plain version"
-    assert "HTML version" in message.get_body(preferencelist=("html",)).get_content()
+    payload = json.loads(encoded)
+    assert payload["subject"] == "Pool service"
+    assert payload["body"] == {
+        "contentType": "HTML",
+        "content": "<p>HTML version</p>",
+    }
+    assert payload["toRecipients"] == [{"emailAddress": {"address": "customer@example.com"}}]
+    assert payload["internetMessageHeaders"] == [
+        {
+            "name": "X-Tampa-VIP-Job-ID",
+            "value": "42",
+        }
+    ]
+
+
+@responses.activate
+def test_microsoft_structured_draft_preserves_long_action_urls(monkeypatch) -> None:
+    monkeypatch.setenv("OUTLOOK_SENDER_ADDRESS", "office@example.com")
+    client = MicrosoftGraphClient()
+    monkeypatch.setattr(client, "access_token", lambda: "access-token")
+    draft_url = "https://graph.microsoft.com/v1.0/users/office%40example.com/messages"
+    send_url = "https://graph.microsoft.com/v1.0/users/office%40example.com/messages/draft-1/send"
+    responses.post(draft_url, json={"id": "draft-1"}, status=201)
+    responses.post(send_url, status=202)
+    review_url = "https://example.com/review/" + ("r" * 64)
+    unsubscribe_url = "https://example.com/unsubscribe/" + ("u" * 64)
+    html_body = f'<a href="{review_url}">Review</a><a href="{unsubscribe_url}">Unsubscribe</a>'
+
+    client.send_email(
+        destination="customer@example.com",
+        subject="Pool service",
+        text_body="Plain version",
+        html_body=html_body,
+        message_job_id=42,
+    )
+
+    encoded = responses.calls[0].request.body
+    assert isinstance(encoded, (str, bytes))
+    payload = json.loads(encoded)
+    assert payload["body"]["content"] == html_body
+    assert review_url in payload["body"]["content"]
+    assert unsubscribe_url in payload["body"]["content"]
 
 
 @responses.activate
