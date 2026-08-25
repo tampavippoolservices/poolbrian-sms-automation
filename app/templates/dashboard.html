@@ -79,14 +79,8 @@
       <p>Monitor customer messages, review campaigns, provider connections, and worker health from one place. Signed in as {{ identity or "administrator" }}.</p>
     </div>
     <div class="toolbar" aria-label="Provider connections">
-      <form method="post" action="/google/connect">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit"><span aria-hidden="true">G</span> Connect Google</button>
-      </form>
-      <form method="post" action="/microsoft/connect">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="secondary" type="submit"><span aria-hidden="true">M</span> Connect Outlook</button>
-      </form>
+      <a class="button" href="/google/connect"><span aria-hidden="true">G</span> Connect Google</a>
+      <a class="button button--secondary" href="/microsoft/connect"><span aria-hidden="true">M</span> Connect Outlook</a>
     </div>
   </div>
 

@@ -13,10 +13,14 @@ logger = logging.getLogger(__name__)
 google_bp = Blueprint("google", __name__, url_prefix="/google")
 
 
-@google_bp.post("/connect")
+@google_bp.route("/connect", methods=["GET", "POST"])
 @require_admin
 def connect():
-    validate_csrf()
+    # Use a top-level GET navigation for OAuth. A POST followed by an external
+    # redirect can be blocked by browsers when form-action is restricted to
+    # this application. Preserve POST compatibility with CSRF validation.
+    if request.method == "POST":
+        validate_csrf()
     state = create_oauth_state("google", admin_identity())
     return redirect(GoogleBusinessClient().authorization_url(state))
 

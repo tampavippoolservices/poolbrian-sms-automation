@@ -92,3 +92,7 @@ def test_dashboard_has_independent_search_and_pagination(monkeypatch) -> None:
     assert b"Showing 51\xe2\x80\x9375 of 80" in response.data
     assert b"Page 3 of 4" in response.data
     assert b"No matching entries" in response.data
+    assert b'href="/google/connect"' in response.data
+    assert b'href="/microsoft/connect"' in response.data
+    assert b'action="/google/connect"' not in response.data
+    assert b'action="/microsoft/connect"' not in response.data
