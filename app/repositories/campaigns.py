@@ -65,16 +65,29 @@ def create_completed_service_workflow(
                 max_attempts=max_attempts,
             )
 
-        connection.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
-            {"key": f"review-customer:{customer_id}"},
-        )
+        # Serialize campaign creation across every stable recipient identity.
+        # Lock keys are sorted so concurrent requests acquire multiple locks in
+        # a consistent order and cannot deadlock one another.
+        recipient_lock_keys = {f"review-customer:{customer_id}"}
+        if phone_e164:
+            recipient_lock_keys.add(f"review-phone:{phone_e164}")
+        if email_normalized:
+            recipient_lock_keys.add(f"review-email:{email_normalized}")
+        for lock_key in sorted(recipient_lock_keys):
+            connection.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": lock_key},
+            )
         suppressed_campaign = connection.execute(
             text(
                 """
                 SELECT id
                 FROM review_campaigns
-                WHERE customer_id = :customer_id
+                WHERE (
+                    customer_id = :customer_id
+                    OR phone_e164 = :phone
+                    OR email_normalized = :email
+                )
                   AND (
                       confirmed_at IS NOT NULL
                       OR (
@@ -85,7 +98,12 @@ def create_completed_service_workflow(
                 LIMIT 1
                 """
             ),
-            {"customer_id": customer_id, "days": suppression_days},
+            {
+                "customer_id": customer_id,
+                "phone": phone_e164,
+                "email": email_normalized,
+                "days": suppression_days,
+            },
         ).first()
         if suppressed_campaign:
             return {
