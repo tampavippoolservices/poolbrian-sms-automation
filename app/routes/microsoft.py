@@ -73,10 +73,14 @@ def admin_logout():
     return redirect("/auth/login")
 
 
-@microsoft_bp.post("/microsoft/connect")
+@microsoft_bp.route("/microsoft/connect", methods=["GET", "POST"])
 @require_admin
 def outlook_connect():
-    validate_csrf()
+    # OAuth begins with a top-level GET navigation so browsers do not apply the
+    # dashboard's form-action CSP to the cross-origin Microsoft redirect. Keep
+    # POST support for older dashboard versions and validate those submissions.
+    if request.method == "POST":
+        validate_csrf()
     state = create_oauth_state("microsoft", admin_identity())
     return redirect(MicrosoftGraphClient().authorization_url(state))
 
