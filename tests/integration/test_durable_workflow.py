@@ -12,6 +12,7 @@ from app.repositories.jobs import (
     mark_accepted,
     mark_sending,
     record_provider_event,
+    retry_dead_or_failed_job,
 )
 from app.repositories.preferences import is_suppressed, save_preference
 
@@ -206,3 +207,188 @@ def test_fast_provider_callback_cannot_be_overwritten_by_sender() -> None:
     assert final["status"] == "delivered"
     assert final["provider_status"] == "delivered"
     assert final["locked_by"] is None
+
+
+def test_manual_retry_preserves_attempt_history_and_replaces_provider_reference() -> None:
+    create_completed_service_workflow(
+        source_job_id=9004,
+        customer_id=504,
+        customer_name="Customer",
+        phone_e164="+18135551212",
+        email_normalized=None,
+        now=datetime(2026, 8, 20, 16, 0, tzinfo=UTC),
+        timezone_name="America/New_York",
+        sms_delay_hours=3,
+        email_hour=10,
+        suppression_days=120,
+        max_attempts=5,
+    )
+    first = claim_message_jobs(
+        worker_id="sender-one",
+        limit=1,
+        lease_minutes=10,
+        allowed_kinds=["completed_service_sms"],
+    )[0]
+    job_id = int(first["id"])
+    first_message_id = "SM11111111111111111111111111111111"
+    second_message_id = "SM22222222222222222222222222222222"
+
+    assert first["attempt_count"] == 1
+    assert mark_sending(job_id, "sender-one")
+    assert mark_accepted(
+        job_id=job_id,
+        worker_id="sender-one",
+        provider="twilio",
+        provider_message_id=first_message_id,
+        provider_status="accepted",
+        status_rank=provider_status_rank("accepted"),
+    )
+    record_provider_event(
+        provider="twilio",
+        provider_message_id=first_message_id,
+        status="undelivered",
+        status_rank=provider_status_rank("undelivered"),
+        error_code="30006",
+        destination="+18135551212",
+        payload={"MessageStatus": "undelivered", "ErrorCode": "30006"},
+        message_job_id=job_id,
+    )
+
+    assert retry_dead_or_failed_job(job_id)
+    with transaction() as connection:
+        retried = (
+            connection.execute(
+                text(
+                    """
+                    SELECT status, attempt_count, provider, provider_message_id,
+                           provider_status, provider_status_rank
+                    FROM message_jobs WHERE id = :job_id
+                    """
+                ),
+                {"job_id": job_id},
+            )
+            .mappings()
+            .one()
+        )
+    assert dict(retried) == {
+        "status": "queued",
+        "attempt_count": 1,
+        "provider": None,
+        "provider_message_id": None,
+        "provider_status": None,
+        "provider_status_rank": 0,
+    }
+
+    second = claim_message_jobs(
+        worker_id="sender-two",
+        limit=1,
+        lease_minutes=10,
+        allowed_kinds=["completed_service_sms"],
+    )[0]
+    assert second["id"] == job_id
+    assert second["attempt_count"] == 2
+    assert mark_sending(job_id, "sender-two")
+    assert mark_accepted(
+        job_id=job_id,
+        worker_id="sender-two",
+        provider="twilio",
+        provider_message_id=second_message_id,
+        provider_status="accepted",
+        status_rank=provider_status_rank("accepted"),
+    )
+
+    with transaction() as connection:
+        final = (
+            connection.execute(
+                text(
+                    """
+                    SELECT status, attempt_count, provider_message_id
+                    FROM message_jobs WHERE id = :job_id
+                    """
+                ),
+                {"job_id": job_id},
+            )
+            .mappings()
+            .one()
+        )
+        attempts = list(
+            connection.execute(
+                text(
+                    """
+                    SELECT attempt_number, provider_message_id
+                    FROM message_attempts
+                    WHERE message_job_id = :job_id
+                    ORDER BY attempt_number
+                    """
+                ),
+                {"job_id": job_id},
+            ).mappings()
+        )
+    assert dict(final) == {
+        "status": "accepted",
+        "attempt_count": 2,
+        "provider_message_id": second_message_id,
+    }
+    assert [dict(attempt) for attempt in attempts] == [
+        {"attempt_number": 1, "provider_message_id": first_message_id},
+        {"attempt_number": 2, "provider_message_id": second_message_id},
+    ]
+
+
+def test_claim_repairs_legacy_attempt_counter_drift() -> None:
+    create_completed_service_workflow(
+        source_job_id=9005,
+        customer_id=505,
+        customer_name="Customer",
+        phone_e164="+18135551212",
+        email_normalized=None,
+        now=datetime(2026, 8, 20, 16, 0, tzinfo=UTC),
+        timezone_name="America/New_York",
+        sms_delay_hours=3,
+        email_hour=10,
+        suppression_days=120,
+        max_attempts=5,
+    )
+    first = claim_message_jobs(
+        worker_id="sender-one",
+        limit=1,
+        lease_minutes=10,
+        allowed_kinds=["completed_service_sms"],
+    )[0]
+    job_id = int(first["id"])
+    with transaction() as connection:
+        connection.execute(
+            text(
+                """
+                UPDATE message_jobs
+                SET status = 'queued', attempt_count = 0,
+                    locked_at = NULL, locked_by = NULL, lease_expires_at = NULL
+                WHERE id = :job_id
+                """
+            ),
+            {"job_id": job_id},
+        )
+
+    repaired = claim_message_jobs(
+        worker_id="sender-two",
+        limit=1,
+        lease_minutes=10,
+        allowed_kinds=["completed_service_sms"],
+    )[0]
+
+    assert repaired["id"] == job_id
+    assert repaired["attempt_count"] == 2
+    with transaction() as connection:
+        attempt_numbers = list(
+            connection.execute(
+                text(
+                    """
+                    SELECT attempt_number FROM message_attempts
+                    WHERE message_job_id = :job_id
+                    ORDER BY attempt_number
+                    """
+                ),
+                {"job_id": job_id},
+            ).scalars()
+        )
+    assert attempt_numbers == [1, 2]
