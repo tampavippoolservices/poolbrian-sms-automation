@@ -207,14 +207,20 @@ def process_due_messages(config: AppConfig, *, limit: int = 50) -> dict[str, int
         job_id = int(job["id"])
         destination = str(job.get("destination_normalized") or "")
         channel = str(job["channel"])
-        if not destination or is_suppressed(channel, destination):
+        message_kind = str(job["message_kind"])
+        if not destination or (
+            not message_kind.startswith("admin_") and is_suppressed(channel, destination)
+        ):
             cancel_message_job(job_id, current_worker, "missing or suppressed destination")
             cancelled += 1
             continue
         provider_accepted = False
         try:
             unsubscribe_token = None
-            if channel == "email":
+            if channel == "email" and message_kind in {
+                "next_day_review_email",
+                "saturday_review_email",
+            }:
                 unsubscribe_token = get_or_create_unsubscribe_token(
                     message_job_id=job_id,
                     channel="email",
@@ -551,6 +557,7 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
                 "water_level_low_sms",
                 "admin_customer_reply_sms",
                 "admin_delivery_failure_sms",
+                "admin_website_lead_sms",
             ]
         )
     if within_local_hours(now, config.BUSINESS_TIMEZONE, 9, 19):
@@ -562,6 +569,8 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
                     "saturday_review_email",
                 ]
             )
+    if config.OUTLOOK_SEND_ENABLED:
+        kinds.append("admin_website_lead_email")
     return kinds
 
 

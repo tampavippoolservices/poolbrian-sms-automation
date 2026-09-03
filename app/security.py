@@ -101,5 +101,18 @@ def valid_poolbrain_webhook() -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def valid_website_lead_webhook() -> bool:
+    secret = os.getenv("WEBSITE_LEAD_WEBHOOK_SECRET")
+    signature = request.headers.get("X-Tampa-VIP-Signature", "").strip()
+    if not secret or not signature:
+        return False
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        request.get_data(cache=True),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 def payload_sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()

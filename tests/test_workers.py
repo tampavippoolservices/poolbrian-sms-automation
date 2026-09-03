@@ -52,3 +52,6 @@ def test_email_jobs_require_outlook_send_flag(monkeypatch) -> None:
     assert "saturday_review_email" not in disabled_kinds
     assert "next_day_review_email" in enabled_kinds
     assert "saturday_review_email" in enabled_kinds
+    assert "admin_website_lead_sms" in enabled_kinds
+    assert "admin_website_lead_email" not in disabled_kinds
+    assert "admin_website_lead_email" in enabled_kinds

@@ -553,6 +553,59 @@ def enqueue_delivery_failure_alert(
         return result.rowcount == 1
 
 
+def enqueue_website_lead_notifications(
+    *,
+    event_id: str,
+    sms_destination: str,
+    email_destination: str,
+    lead: dict[str, object],
+    max_attempts: int,
+) -> dict[str, bool]:
+    template_data = json.dumps(lead)
+    with transaction() as connection:
+        sms = connection.execute(
+            text(
+                """
+                INSERT INTO message_jobs (
+                    idempotency_key, channel, message_kind, destination_normalized,
+                    template_key, template_data, scheduled_at, max_attempts
+                ) VALUES (
+                    :key, 'sms', 'admin_website_lead_sms', :destination,
+                    'admin_website_lead_sms', CAST(:data AS JSONB), NOW(), :max_attempts
+                )
+                ON CONFLICT (idempotency_key) DO NOTHING
+                """
+            ),
+            {
+                "key": f"website-lead:{event_id}:sms",
+                "destination": sms_destination,
+                "data": template_data,
+                "max_attempts": max_attempts,
+            },
+        )
+        email = connection.execute(
+            text(
+                """
+                INSERT INTO message_jobs (
+                    idempotency_key, channel, message_kind, destination_normalized,
+                    template_key, template_data, scheduled_at, max_attempts
+                ) VALUES (
+                    :key, 'email', 'admin_website_lead_email', :destination,
+                    'admin_website_lead_email', CAST(:data AS JSONB), NOW(), :max_attempts
+                )
+                ON CONFLICT (idempotency_key) DO NOTHING
+                """
+            ),
+            {
+                "key": f"website-lead:{event_id}:email",
+                "destination": email_destination,
+                "data": template_data,
+                "max_attempts": max_attempts,
+            },
+        )
+        return {"sms": sms.rowcount == 1, "email": email.rowcount == 1}
+
+
 def cancel_suppressed_queued_jobs() -> int:
     with transaction() as connection:
         result = connection.execute(
