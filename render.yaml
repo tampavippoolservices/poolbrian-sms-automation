@@ -105,6 +105,14 @@ services:
     envVars: *sharedEnv
 
   - type: cron
+    name: tampa-vip-website-lead-notifier
+    runtime: python
+    schedule: "*/2 * * * *"
+    buildCommand: pip install --require-hashes -r requirements.lock
+    startCommand: python -m app.cli process-website-leads
+    envVars: *sharedEnv
+
+  - type: cron
     name: tampa-vip-google-review-sync
     runtime: python
     schedule: "17 */6 * * *"
