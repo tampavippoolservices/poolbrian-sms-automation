@@ -181,6 +181,7 @@ def process_due_messages(
     *,
     limit: int = 50,
     allowed_message_kinds: list[str] | None = None,
+    idempotency_prefix: str | None = None,
     heartbeat_name: str = "process_due_messages",
 ) -> dict[str, int]:
     name = heartbeat_name
@@ -206,6 +207,7 @@ def process_due_messages(
         limit=limit,
         lease_minutes=config.MESSAGE_LEASE_MINUTES,
         allowed_kinds=allowed_kinds,
+        idempotency_prefix=idempotency_prefix,
     )
     accepted = 0
     failed = 0
@@ -357,6 +359,16 @@ def process_website_lead_messages(config: AppConfig, *, limit: int = 50) -> dict
         limit=limit,
         allowed_message_kinds=_website_lead_message_kinds(config),
         heartbeat_name="process_website_lead_messages",
+    )
+
+
+def process_website_lead_event(config: AppConfig, *, event_id: str) -> dict[str, int]:
+    return process_due_messages(
+        config,
+        limit=2,
+        allowed_message_kinds=_website_lead_message_kinds(config),
+        idempotency_prefix=f"website-lead:{event_id}:",
+        heartbeat_name="dispatch_website_lead_event",
     )
 
 

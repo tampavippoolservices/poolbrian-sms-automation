@@ -15,6 +15,7 @@ def claim_message_jobs(
     limit: int,
     lease_minutes: int,
     allowed_kinds: list[str] | None = None,
+    idempotency_prefix: str | None = None,
 ) -> list[dict[str, Any]]:
     with transaction() as connection:
         rows = connection.execute(
@@ -44,6 +45,10 @@ def claim_message_jobs(
                           CAST(:allowed_kinds AS TEXT[]) IS NULL
                           OR job.message_kind = ANY(CAST(:allowed_kinds AS TEXT[]))
                       )
+                      AND (
+                          CAST(:idempotency_prefix AS TEXT) IS NULL
+                          OR job.idempotency_key LIKE CAST(:idempotency_prefix AS TEXT) || '%'
+                      )
                     ORDER BY job.scheduled_at, job.id
                     LIMIT :limit
                     FOR UPDATE OF job SKIP LOCKED
@@ -68,6 +73,7 @@ def claim_message_jobs(
                 "worker_id": worker_id,
                 "lease_minutes": lease_minutes,
                 "allowed_kinds": allowed_kinds,
+                "idempotency_prefix": idempotency_prefix,
             },
         ).mappings()
         claimed = [dict(row) for row in rows]

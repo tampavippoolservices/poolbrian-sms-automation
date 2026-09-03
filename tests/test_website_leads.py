@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+from types import SimpleNamespace
 
 from flask import Flask
 
@@ -68,3 +69,37 @@ def test_unsigned_website_lead_is_rejected(monkeypatch) -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_signed_dispatch_processes_only_requested_website_lead(monkeypatch) -> None:
+    app = Flask(__name__)
+    app.register_blueprint(webhooks.webhook_bp)
+    secret = "website-lead-secret"
+    monkeypatch.setenv("WEBSITE_LEAD_WEBHOOK_SECRET", secret)
+    config = SimpleNamespace()
+    monkeypatch.setattr(
+        webhooks.AppConfig,
+        "from_environment",
+        classmethod(lambda _cls: config),
+    )
+    dispatched: dict[str, object] = {}
+
+    def fake_dispatch(received_config, *, event_id):
+        dispatched.update(config=received_config, event_id=event_id)
+        return {"claimed": 2, "accepted": 2}
+
+    monkeypatch.setattr(webhooks, "process_website_lead_event", fake_dispatch)
+    payload = {"event": "website.lead.dispatch", "id": "site-lead-42"}
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+    response = app.test_client().post(
+        "/webhooks/website-lead/dispatch",
+        data=body,
+        content_type="application/json",
+        headers={"X-Tampa-VIP-Signature": signature},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["delivery"] == {"accepted": 2, "claimed": 2}
+    assert dispatched == {"config": config, "event_id": "site-lead-42"}

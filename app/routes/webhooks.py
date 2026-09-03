@@ -10,6 +10,7 @@ from typing import Any
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
 
+from app.config import AppConfig
 from app.domain.contact import (
     InvalidContact,
     masked_destination,
@@ -30,6 +31,7 @@ from app.security import (
     valid_twilio_request,
     valid_website_lead_webhook,
 )
+from app.workers import process_website_lead_event
 
 logger = logging.getLogger(__name__)
 webhook_bp = Blueprint("webhooks", __name__, url_prefix="/webhooks")
@@ -123,6 +125,35 @@ def website_lead():
         max_attempts=int(current_app.config["MESSAGE_MAX_ATTEMPTS"]),
     )
     return jsonify({"accepted": True, "created": created}), 202
+
+
+@webhook_bp.post("/website-lead/dispatch")
+def dispatch_website_lead():
+    if not valid_website_lead_webhook():
+        logger.warning(
+            "Rejected invalid website lead dispatch",
+            extra={"event": "webhook_rejected"},
+        )
+        abort(403)
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or payload.get("event") != "website.lead.dispatch":
+        abort(400, "Website lead dispatch event is invalid")
+    event_id = str(payload.get("id") or "").strip()
+    if not _WEBSITE_LEAD_ID_PATTERN.fullmatch(event_id):
+        abort(400, "Website lead id is invalid")
+
+    try:
+        result = process_website_lead_event(
+            AppConfig.from_environment(),
+            event_id=event_id,
+        )
+    except Exception:
+        logger.exception(
+            "Immediate website lead dispatch failed; scheduled worker will retry",
+            extra={"event": "website_lead_dispatch_failed", "external_id": event_id},
+        )
+        abort(503, "Immediate dispatch is temporarily unavailable")
+    return jsonify({"accepted": True, "event_id": event_id, "delivery": result}), 200
 
 
 @webhook_bp.post("/twilio/inbound")
