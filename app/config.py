@@ -55,6 +55,7 @@ class AppConfig:
     GOOGLE_SYNC_ENABLED: bool
     OUTLOOK_SEND_ENABLED: bool
     OUTLOOK_BOUNCE_SYNC_ENABLED: bool
+    POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED: bool
 
     @classmethod
     def from_environment(cls) -> AppConfig:
@@ -83,6 +84,7 @@ class AppConfig:
             GOOGLE_SYNC_ENABLED=_boolean("GOOGLE_SYNC_ENABLED"),
             OUTLOOK_SEND_ENABLED=_boolean("OUTLOOK_SEND_ENABLED"),
             OUTLOOK_BOUNCE_SYNC_ENABLED=_boolean("OUTLOOK_BOUNCE_SYNC_ENABLED"),
+            POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED=_boolean("POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED"),
         )
         config.validate()
         return config

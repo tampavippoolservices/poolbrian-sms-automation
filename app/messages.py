@@ -107,7 +107,8 @@ def render_message(
         return RenderedMessage(
             text=(
                 f"New website lead #{data.get('lead_id')}: {data.get('name')} | "
-                f"{data.get('phone')} | ZIP {data.get('zip')} | {data.get('service')} | {mode}."
+                f"{data.get('phone')} | {data.get('address')}, {data.get('city')} FL "
+                f"{data.get('zip')} | {data.get('service')} | {mode}."
             )
         )
     if template_key == "admin_website_lead_email":
@@ -115,6 +116,10 @@ def render_message(
         values = {
             "name": str(data.get("name") or "Not provided"),
             "phone": str(data.get("phone") or "Not provided"),
+            "email": str(data.get("email") or "Not provided"),
+            "address": str(data.get("address") or "Not provided"),
+            "city": str(data.get("city") or "Not provided"),
+            "state": str(data.get("state") or "FL"),
             "zip": str(data.get("zip") or "Not provided"),
             "service": str(data.get("service") or "Not provided"),
             "preferred_date": str(data.get("preferred_date") or "Not provided"),
@@ -126,7 +131,9 @@ def render_message(
         text_body = (
             f"New Tampa VIP website lead #{data.get('lead_id')}\n\n"
             f"Request: {mode}\nName: {values['name']}\nPhone: {values['phone']}\n"
-            f"ZIP: {values['zip']}\nService: {values['service']}\n"
+            f"Email: {values['email']}\nAddress: {values['address']}, {values['city']} "
+            f"{values['state']} {values['zip']}\n"
+            f"Service: {values['service']}\n"
             f"Preferred date: {values['preferred_date']}\n"
             f"Preferred time: {values['preferred_time']}\n"
             f"Customer agreed to request-related texts: {values['sms_consent']}\n\n"
@@ -140,7 +147,11 @@ def render_message(
                 ("Request", mode),
                 ("Name", values["name"]),
                 ("Phone", values["phone"]),
-                ("ZIP", values["zip"]),
+                ("Email", values["email"]),
+                (
+                    "Service address",
+                    f"{values['address']}, {values['city']} {values['state']} {values['zip']}",
+                ),
                 ("Service", values["service"]),
                 ("Preferred date", values["preferred_date"]),
                 ("Preferred time", values["preferred_time"]),

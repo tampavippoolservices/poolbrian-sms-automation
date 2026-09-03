@@ -60,6 +60,10 @@ def claim_inbound_events(
     worker_id: str,
     limit: int,
     lease_minutes: int,
+    provider: str | None = None,
+    excluded_provider: str | None = None,
+    event_type: str | None = None,
+    external_id: str | None = None,
 ) -> list[dict[str, Any]]:
     with transaction() as connection:
         rows = connection.execute(
@@ -70,6 +74,10 @@ def claim_inbound_events(
                     FROM inbound_events
                     WHERE status IN ('queued', 'retry')
                       AND next_attempt_at <= NOW()
+                      AND (:provider IS NULL OR provider = :provider)
+                      AND (:excluded_provider IS NULL OR provider <> :excluded_provider)
+                      AND (:event_type IS NULL OR event_type = :event_type)
+                      AND (:external_id IS NULL OR external_id = :external_id)
                     ORDER BY next_attempt_at, id
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
@@ -86,12 +94,26 @@ def claim_inbound_events(
                 RETURNING event.*
                 """
             ),
-            {"limit": limit, "worker_id": worker_id, "lease_minutes": lease_minutes},
+            {
+                "limit": limit,
+                "worker_id": worker_id,
+                "lease_minutes": lease_minutes,
+                "provider": provider,
+                "excluded_provider": excluded_provider,
+                "event_type": event_type,
+                "external_id": external_id,
+            },
         ).mappings()
         return [dict(row) for row in rows]
 
 
-def complete_inbound_event(event_id: int, worker_id: str) -> None:
+def complete_inbound_event(
+    event_id: int,
+    worker_id: str,
+    *,
+    provider_record_id: str | None = None,
+    result: dict[str, Any] | None = None,
+) -> None:
     with transaction() as connection:
         connection.execute(
             text(
@@ -99,11 +121,18 @@ def complete_inbound_event(event_id: int, worker_id: str) -> None:
                 UPDATE inbound_events
                 SET status = 'completed', completed_at = NOW(), updated_at = NOW(),
                     locked_at = NULL, locked_by = NULL, lease_expires_at = NULL,
-                    last_error = NULL
+                    last_error = NULL,
+                    provider_record_id = :provider_record_id,
+                    result = CAST(:result AS JSONB)
                 WHERE id = :event_id AND locked_by = :worker_id AND status = 'leased'
                 """
             ),
-            {"event_id": event_id, "worker_id": worker_id},
+            {
+                "event_id": event_id,
+                "worker_id": worker_id,
+                "provider_record_id": provider_record_id,
+                "result": json.dumps(result) if result is not None else None,
+            },
         )
 
 
@@ -112,6 +141,8 @@ def fail_inbound_event(
     worker_id: str,
     error: str,
     next_attempt_at: datetime,
+    *,
+    result: dict[str, Any] | None = None,
 ) -> None:
     with transaction() as connection:
         connection.execute(
@@ -121,6 +152,7 @@ def fail_inbound_event(
                 SET status = CASE WHEN attempt_count >= max_attempts THEN 'dead' ELSE 'retry' END,
                     next_attempt_at = :next_attempt_at,
                     last_error = :error,
+                    result = COALESCE(CAST(:result AS JSONB), result),
                     locked_at = NULL, locked_by = NULL, lease_expires_at = NULL,
                     updated_at = NOW()
                 WHERE id = :event_id AND locked_by = :worker_id AND status = 'leased'
@@ -131,6 +163,7 @@ def fail_inbound_event(
                 "worker_id": worker_id,
                 "error": error[:1000],
                 "next_attempt_at": next_attempt_at,
+                "result": json.dumps(result) if result is not None else None,
             },
         )
 

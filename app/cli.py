@@ -19,7 +19,7 @@ from app.workers import (
     process_all,
     process_due_messages,
     process_inbound_events,
-    process_website_lead_messages,
+    process_website_leads,
     recover_stale_work,
     sync_google_reviews,
     sync_outlook_bounces,
@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "process-messages":
             result = process_due_messages(config)
         elif args.command == "process-website-leads":
-            result = process_website_lead_messages(config)
+            result = process_website_leads(config)
         elif args.command == "recover-stale-work":
             result = recover_stale_work()
         elif args.command == "sync-google-reviews":

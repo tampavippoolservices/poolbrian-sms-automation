@@ -17,12 +17,18 @@ def test_signed_website_lead_queues_email_and_sms(monkeypatch) -> None:
     monkeypatch.setenv("WEBSITE_LEAD_SMS_DESTINATION", "8134421960")
     monkeypatch.setenv("WEBSITE_LEAD_EMAIL_DESTINATION", "contact@tampavippoolservices.com")
     queued: dict[str, object] = {}
+    stored: dict[str, object] = {}
 
     def fake_enqueue(**kwargs):
         queued.update(kwargs)
         return {"sms": True, "email": True}
 
+    def fake_store(**kwargs):
+        stored.update(kwargs)
+        return 7, True
+
     monkeypatch.setattr(webhooks, "enqueue_website_lead_notifications", fake_enqueue)
+    monkeypatch.setattr(webhooks, "store_inbound_event", fake_store)
     payload = {
         "event": "website.lead.created",
         "id": "site-lead-42",
@@ -32,6 +38,9 @@ def test_signed_website_lead_queues_email_and_sms(monkeypatch) -> None:
             "mode": "schedule",
             "name": "Taylor Smith",
             "phone": "(813) 555-0199",
+            "email": "Taylor@example.com",
+            "address": "123 Bayshore Blvd",
+            "city": "Tampa",
             "zip": "33609",
             "service": "Weekly pool service",
             "preferred_date": "2026-09-05",
@@ -55,6 +64,9 @@ def test_signed_website_lead_queues_email_and_sms(monkeypatch) -> None:
     assert queued["sms_destination"] == "+18134421960"
     assert queued["email_destination"] == "contact@tampavippoolservices.com"
     assert queued["lead"]["phone"] == "+18135550199"  # type: ignore[index]
+    assert queued["lead"]["email"] == "taylor@example.com"  # type: ignore[index]
+    assert stored["provider"] == "website"
+    assert stored["event_type"] == "website.lead.poolbrain_sync"
 
 
 def test_unsigned_website_lead_is_rejected(monkeypatch) -> None:

@@ -85,6 +85,7 @@ def website_lead():
     if not valid_website_lead_webhook():
         logger.warning("Rejected invalid website lead webhook", extra={"event": "webhook_rejected"})
         abort(403)
+    raw_body = request.get_data(cache=True)
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict) or payload.get("event") != "website.lead.created":
         abort(400, "Website lead event is invalid")
@@ -96,9 +97,13 @@ def website_lead():
     try:
         sms_destination = normalize_us_phone(os.getenv("WEBSITE_LEAD_SMS_DESTINATION"))
         email_destination = normalize_email(os.getenv("WEBSITE_LEAD_EMAIL_DESTINATION"))
-        customer_phone = normalize_us_phone(_lead_text(lead, "phone", 40))
     except InvalidContact:
         abort(503, "Website lead delivery destinations are not configured")
+    try:
+        customer_phone = normalize_us_phone(_lead_text(lead, "phone", 40))
+        customer_email = normalize_email(_lead_text(lead, "email", 254))
+    except InvalidContact:
+        abort(400, "Website lead contact information is invalid")
 
     mode = _lead_text(lead, "mode", 20)
     if mode not in {"schedule", "callback"}:
@@ -108,6 +113,10 @@ def website_lead():
         "mode": mode,
         "name": _lead_text(lead, "name", 120),
         "phone": customer_phone,
+        "email": customer_email,
+        "address": _lead_text(lead, "address", 180),
+        "city": _lead_text(lead, "city", 80),
+        "state": "FL",
         "zip": _lead_text(lead, "zip", 10),
         "service": _lead_text(lead, "service", 120),
         "preferred_date": _optional_lead_text(lead, "preferred_date", 20),
@@ -117,14 +126,28 @@ def website_lead():
     }
     if not normalized_lead["lead_id"]:
         abort(400, "Website lead id is invalid")
-    created = enqueue_website_lead_notifications(
+    _, sync_created = store_inbound_event(
+        provider="website",
+        event_type="website.lead.poolbrain_sync",
+        external_id=event_id,
+        payload=normalized_lead,
+        payload_sha256=payload_sha256(raw_body),
+        max_attempts=int(current_app.config["MESSAGE_MAX_ATTEMPTS"]),
+    )
+    notifications_created = enqueue_website_lead_notifications(
         event_id=event_id,
         sms_destination=sms_destination,
         email_destination=email_destination,
         lead=normalized_lead,
         max_attempts=int(current_app.config["MESSAGE_MAX_ATTEMPTS"]),
     )
-    return jsonify({"accepted": True, "created": created}), 202
+    return jsonify(
+        {
+            "accepted": True,
+            "poolbrain_sync_created": sync_created,
+            "notifications_created": notifications_created,
+        }
+    ), 202
 
 
 @webhook_bp.post("/website-lead/dispatch")
