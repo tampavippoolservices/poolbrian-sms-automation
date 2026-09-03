@@ -52,6 +52,9 @@ attention.
 - 403 webhook: compare the configured signing secret and raw-body signing method.
 - API 401/403: rotate/update `POOLBRAIN_API_KEY`.
 - malformed alert ID: event is retained/retried and the invalid alert is logged without sending.
+- website lead sync failures: inspect the `website.lead.poolbrain_sync` inbound event. Exact phone,
+  email, and full-address checks run before every create attempt, including retries. Do not manually
+  activate the customer until the stored result shows the correct PoolBrain customer ID.
 
 ### Microsoft Outlook
 

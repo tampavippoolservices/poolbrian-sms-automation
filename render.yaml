@@ -37,8 +37,12 @@ services:
         sync: false
       - key: POOLBRAIN_API_KEY
         sync: false
+      - key: POOLBRAIN_COMPANY_ID
+        sync: false
       - key: POOLBRAIN_WEBHOOK_SIGNING_SECRET
         sync: false
+      - key: POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED
+        value: "false"
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN

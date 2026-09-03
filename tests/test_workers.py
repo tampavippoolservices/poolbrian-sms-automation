@@ -112,7 +112,10 @@ def test_website_lead_worker_uses_dedicated_filter_and_heartbeat(monkeypatch) ->
 
 
 def test_website_lead_event_worker_scopes_claim_to_one_event(monkeypatch) -> None:
-    config = cast(AppConfig, SimpleNamespace())
+    config = cast(
+        AppConfig,
+        SimpleNamespace(POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED=True),
+    )
     captured: dict[str, object] = {}
     monkeypatch.setattr(
         workers,
@@ -125,11 +128,20 @@ def test_website_lead_event_worker_scopes_claim_to_one_event(monkeypatch) -> Non
         return {"accepted": 2}
 
     monkeypatch.setattr(workers, "process_due_messages", fake_process)
+    monkeypatch.setattr(
+        workers,
+        "process_website_lead_poolbrain_events",
+        lambda _config, **kwargs: captured.update({"poolbrain": kwargs}) or {"completed": 1},
+    )
 
     result = workers.process_website_lead_event(config, event_id="site-lead-42")
 
-    assert result == {"accepted": 2}
+    assert result == {
+        "poolbrain": {"completed": 1},
+        "notifications": {"accepted": 2},
+    }
     assert captured == {
+        "poolbrain": {"limit": 1, "event_id": "site-lead-42"},
         "limit": 2,
         "allowed_message_kinds": [
             "admin_website_lead_sms",
@@ -137,4 +149,53 @@ def test_website_lead_event_worker_scopes_claim_to_one_event(monkeypatch) -> Non
         ],
         "idempotency_prefix": "website-lead:site-lead-42:",
         "heartbeat_name": "dispatch_website_lead_event",
+    }
+
+
+def test_poolbrain_website_lead_worker_records_traceable_result(monkeypatch) -> None:
+    config = cast(
+        AppConfig,
+        SimpleNamespace(
+            POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED=True,
+            MESSAGE_LEASE_MINUTES=10,
+        ),
+    )
+    event = {
+        "id": 9,
+        "external_id": "site-lead-42",
+        "payload": {"name": "Taylor Smith"},
+        "attempt_count": 1,
+    }
+    completed: dict[str, object] = {}
+    monkeypatch.setattr(workers, "worker_id", lambda: "worker-1")
+    monkeypatch.setattr(workers, "heartbeat_started", lambda _name: None)
+    monkeypatch.setattr(workers, "heartbeat_succeeded", lambda _name, _result: None)
+    monkeypatch.setattr(workers, "claim_inbound_events", lambda **_kwargs: [event])
+
+    class FakePoolBrain:
+        def sync_website_lead(self, event_id, lead, *, creation_previously_attempted=False):
+            assert event_id == "site-lead-42"
+            assert lead == {"name": "Taylor Smith"}
+            assert creation_previously_attempted is False
+            return {
+                "action": "created",
+                "poolbrain_customer_id": 321,
+                "poolbrain_customer_status": "Lead",
+            }
+
+    monkeypatch.setattr(workers, "PoolBrainClient", FakePoolBrain)
+
+    def fake_complete(event_id, worker_id, **kwargs):
+        completed.update(event_id=event_id, worker_id=worker_id, **kwargs)
+
+    monkeypatch.setattr(workers, "complete_inbound_event", fake_complete)
+
+    result = workers.process_website_lead_poolbrain_events(config, event_id="site-lead-42")
+
+    assert result == {"claimed": 1, "completed": 1, "failed": 0}
+    assert completed["provider_record_id"] == "321"
+    assert completed["result"] == {
+        "action": "created",
+        "poolbrain_customer_id": 321,
+        "poolbrain_customer_status": "Lead",
     }

@@ -40,7 +40,7 @@ from app.repositories.state import baseline_completed_jobs, get_state
 from app.repositories.unsubscribe import get_or_create_unsubscribe_token
 from app.services.google import GoogleBusinessClient
 from app.services.microsoft import MicrosoftApiError, MicrosoftGraphClient
-from app.services.poolbrain import PoolBrainClient
+from app.services.poolbrain import PoolBrainClient, PoolBrainCreatePending
 from app.services.twilio import SmsSendError, TwilioSmsClient
 from app.time_utils import utc_now, within_local_hours
 
@@ -149,6 +149,7 @@ def process_inbound_events(config: AppConfig, *, limit: int = 50) -> dict[str, i
         worker_id=current_worker,
         limit=limit,
         lease_minutes=config.MESSAGE_LEASE_MINUTES,
+        excluded_provider="website",
     )
     completed = 0
     failed = 0
@@ -187,9 +188,7 @@ def process_due_messages(
     name = heartbeat_name
     heartbeat_started(name)
     allowed_kinds = (
-        _allowed_message_kinds(config)
-        if allowed_message_kinds is None
-        else allowed_message_kinds
+        _allowed_message_kinds(config) if allowed_message_kinds is None else allowed_message_kinds
     )
     if not allowed_kinds:
         result = {
@@ -362,14 +361,93 @@ def process_website_lead_messages(config: AppConfig, *, limit: int = 50) -> dict
     )
 
 
-def process_website_lead_event(config: AppConfig, *, event_id: str) -> dict[str, int]:
-    return process_due_messages(
+def process_website_lead_poolbrain_events(
+    config: AppConfig,
+    *,
+    limit: int = 50,
+    event_id: str | None = None,
+) -> dict[str, int | str]:
+    name = "process_website_lead_poolbrain_events"
+    heartbeat_started(name)
+    if not config.POOLBRAIN_WEBSITE_LEAD_SYNC_ENABLED:
+        result: dict[str, int | str] = {
+            "status": "disabled",
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+        }
+        heartbeat_succeeded(name, result)
+        return result
+
+    current_worker = worker_id()
+    claimed = claim_inbound_events(
+        worker_id=current_worker,
+        limit=limit,
+        lease_minutes=config.MESSAGE_LEASE_MINUTES,
+        provider="website",
+        event_type="website.lead.poolbrain_sync",
+        external_id=event_id,
+    )
+    completed = 0
+    failed = 0
+    client = PoolBrainClient()
+    for event in claimed:
+        try:
+            sync_result = client.sync_website_lead(
+                str(event["external_id"]),
+                dict(event.get("payload") or {}),
+                creation_previously_attempted=bool(
+                    dict(event.get("result") or {}).get("creation_attempted")
+                ),
+            )
+            customer_id = _positive_int(sync_result.get("poolbrain_customer_id"))
+            complete_inbound_event(
+                int(event["id"]),
+                current_worker,
+                provider_record_id=str(customer_id) if customer_id else None,
+                result=sync_result,
+            )
+            completed += 1
+        except Exception as exc:
+            failed += 1
+            fail_inbound_event(
+                int(event["id"]),
+                current_worker,
+                str(exc),
+                utc_now() + retry_delay(int(event["attempt_count"])),
+                result={"creation_attempted": True}
+                if isinstance(exc, PoolBrainCreatePending)
+                else None,
+            )
+            logger.exception(
+                "Website lead PoolBrain synchronization failed",
+                extra={
+                    "event": "website_lead_poolbrain_sync_failed",
+                    "external_id": event["external_id"],
+                },
+            )
+    result = {"claimed": len(claimed), "completed": completed, "failed": failed}
+    heartbeat_succeeded(name, result)
+    return result
+
+
+def process_website_leads(config: AppConfig, *, limit: int = 50) -> dict[str, object]:
+    return {
+        "poolbrain": process_website_lead_poolbrain_events(config, limit=limit),
+        "notifications": process_website_lead_messages(config, limit=limit),
+    }
+
+
+def process_website_lead_event(config: AppConfig, *, event_id: str) -> dict[str, object]:
+    poolbrain = process_website_lead_poolbrain_events(config, limit=1, event_id=event_id)
+    notifications = process_due_messages(
         config,
         limit=2,
         allowed_message_kinds=_website_lead_message_kinds(config),
         idempotency_prefix=f"website-lead:{event_id}:",
         heartbeat_name="dispatch_website_lead_event",
     )
+    return {"poolbrain": poolbrain, "notifications": notifications}
 
 
 def sync_google_reviews(config: AppConfig) -> dict[str, int | str]:
