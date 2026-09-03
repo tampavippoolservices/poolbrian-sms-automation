@@ -33,7 +33,7 @@ def test_process_all_continues_after_independent_step_failure(monkeypatch) -> No
     assert result["messages"] == {"accepted": 1}
 
 
-def test_email_jobs_require_outlook_send_flag(monkeypatch) -> None:
+def test_general_worker_excludes_website_leads(monkeypatch) -> None:
     monkeypatch.setattr(workers, "within_local_hours", lambda *_args: True)
     disabled = SimpleNamespace(
         BUSINESS_TIMEZONE="America/New_York",
@@ -52,6 +52,60 @@ def test_email_jobs_require_outlook_send_flag(monkeypatch) -> None:
     assert "saturday_review_email" not in disabled_kinds
     assert "next_day_review_email" in enabled_kinds
     assert "saturday_review_email" in enabled_kinds
-    assert "admin_website_lead_sms" in enabled_kinds
+    assert "admin_website_lead_sms" not in enabled_kinds
     assert "admin_website_lead_email" not in disabled_kinds
-    assert "admin_website_lead_email" in enabled_kinds
+    assert "admin_website_lead_email" not in enabled_kinds
+
+
+def test_website_lead_worker_controls_sms_hours_and_email_flag(monkeypatch) -> None:
+    disabled = SimpleNamespace(
+        BUSINESS_TIMEZONE="America/New_York",
+        OUTLOOK_SEND_ENABLED=False,
+    )
+    enabled = SimpleNamespace(
+        BUSINESS_TIMEZONE="America/New_York",
+        OUTLOOK_SEND_ENABLED=True,
+    )
+
+    monkeypatch.setattr(workers, "within_local_hours", lambda *_args: False)
+    assert workers._website_lead_message_kinds(cast(AppConfig, disabled)) == []
+    assert workers._website_lead_message_kinds(cast(AppConfig, enabled)) == [
+        "admin_website_lead_email"
+    ]
+
+    monkeypatch.setattr(workers, "within_local_hours", lambda *_args: True)
+    assert workers._website_lead_message_kinds(cast(AppConfig, disabled)) == [
+        "admin_website_lead_sms"
+    ]
+    assert workers._website_lead_message_kinds(cast(AppConfig, enabled)) == [
+        "admin_website_lead_sms",
+        "admin_website_lead_email",
+    ]
+
+
+def test_website_lead_worker_uses_dedicated_filter_and_heartbeat(monkeypatch) -> None:
+    config = cast(AppConfig, SimpleNamespace())
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        workers,
+        "_website_lead_message_kinds",
+        lambda _config: ["admin_website_lead_sms", "admin_website_lead_email"],
+    )
+
+    def fake_process(_config, **kwargs):
+        captured.update(kwargs)
+        return {"accepted": 2}
+
+    monkeypatch.setattr(workers, "process_due_messages", fake_process)
+
+    result = workers.process_website_lead_messages(config, limit=12)
+
+    assert result == {"accepted": 2}
+    assert captured == {
+        "limit": 12,
+        "allowed_message_kinds": [
+            "admin_website_lead_sms",
+            "admin_website_lead_email",
+        ],
+        "heartbeat_name": "process_website_lead_messages",
+    }
