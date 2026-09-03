@@ -10,18 +10,33 @@ from typing import Any
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
 
-from app.domain.contact import InvalidContact, masked_destination, normalize_us_phone
+from app.domain.contact import (
+    InvalidContact,
+    masked_destination,
+    normalize_email,
+    normalize_us_phone,
+)
 from app.domain.jobs import provider_status_rank
 from app.repositories.events import store_inbound_event
 from app.repositories.inbound_messages import record_inbound_sms
-from app.repositories.jobs import enqueue_delivery_failure_alert, record_provider_event
-from app.security import payload_sha256, valid_poolbrain_webhook, valid_twilio_request
+from app.repositories.jobs import (
+    enqueue_delivery_failure_alert,
+    enqueue_website_lead_notifications,
+    record_provider_event,
+)
+from app.security import (
+    payload_sha256,
+    valid_poolbrain_webhook,
+    valid_twilio_request,
+    valid_website_lead_webhook,
+)
 
 logger = logging.getLogger(__name__)
 webhook_bp = Blueprint("webhooks", __name__, url_prefix="/webhooks")
 legacy_webhook_bp = Blueprint("legacy_webhooks", __name__)
 
 _SID_PATTERN = re.compile(r"^[A-Za-z0-9]{20,64}$")
+_WEBSITE_LEAD_ID_PATTERN = re.compile(r"^site-lead-[1-9][0-9]{0,18}$")
 _TWILIO_STATUSES = {
     "accepted",
     "scheduled",
@@ -61,6 +76,53 @@ def poolbrain():
         max_attempts=int(current_app.config["MESSAGE_MAX_ATTEMPTS"]),
     )
     return jsonify({"accepted": True, "created": created, "event_id": stored_id}), 202
+
+
+@webhook_bp.post("/website-lead")
+def website_lead():
+    if not valid_website_lead_webhook():
+        logger.warning("Rejected invalid website lead webhook", extra={"event": "webhook_rejected"})
+        abort(403)
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or payload.get("event") != "website.lead.created":
+        abort(400, "Website lead event is invalid")
+    event_id = str(payload.get("id") or "").strip()
+    lead = payload.get("lead")
+    if not _WEBSITE_LEAD_ID_PATTERN.fullmatch(event_id) or not isinstance(lead, dict):
+        abort(400, "Website lead payload is invalid")
+
+    try:
+        sms_destination = normalize_us_phone(os.getenv("WEBSITE_LEAD_SMS_DESTINATION"))
+        email_destination = normalize_email(os.getenv("WEBSITE_LEAD_EMAIL_DESTINATION"))
+        customer_phone = normalize_us_phone(_lead_text(lead, "phone", 40))
+    except InvalidContact:
+        abort(503, "Website lead delivery destinations are not configured")
+
+    mode = _lead_text(lead, "mode", 20)
+    if mode not in {"schedule", "callback"}:
+        abort(400, "Website lead mode is invalid")
+    normalized_lead: dict[str, object] = {
+        "lead_id": _positive_int(lead.get("id")),
+        "mode": mode,
+        "name": _lead_text(lead, "name", 120),
+        "phone": customer_phone,
+        "zip": _lead_text(lead, "zip", 10),
+        "service": _lead_text(lead, "service", 120),
+        "preferred_date": _optional_lead_text(lead, "preferred_date", 20),
+        "preferred_time": _optional_lead_text(lead, "preferred_time", 80),
+        "notes": _optional_lead_text(lead, "notes", 1500),
+        "sms_consent": bool(lead.get("sms_consent")),
+    }
+    if not normalized_lead["lead_id"]:
+        abort(400, "Website lead id is invalid")
+    created = enqueue_website_lead_notifications(
+        event_id=event_id,
+        sms_destination=sms_destination,
+        email_destination=email_destination,
+        lead=normalized_lead,
+        max_attempts=int(current_app.config["MESSAGE_MAX_ATTEMPTS"]),
+    )
+    return jsonify({"accepted": True, "created": created}), 202
 
 
 @webhook_bp.post("/twilio/inbound")
@@ -194,6 +256,20 @@ def _positive_int(value: Any) -> int | None:
         return parsed if parsed > 0 else None
     except (TypeError, ValueError):
         return None
+
+
+def _lead_text(lead: dict[str, Any], key: str, limit: int) -> str:
+    value = str(lead.get(key) or "").strip()
+    if not value or len(value) > limit:
+        abort(400, f"Website lead {key} is invalid")
+    return value
+
+
+def _optional_lead_text(lead: dict[str, Any], key: str, limit: int) -> str | None:
+    value = str(lead.get(key) or "").strip()
+    if len(value) > limit:
+        abort(400, f"Website lead {key} is invalid")
+    return value or None
 
 
 # Compatibility aliases for the existing provider configuration during cutover.

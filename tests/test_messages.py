@@ -43,3 +43,42 @@ def test_email_requires_unsubscribe_token() -> None:
             data={"review_token": "secure-token"},
             public_base_url="https://example.com",
         )
+
+
+def test_website_lead_sms_contains_callback_details() -> None:
+    rendered = render_message(
+        template_key="admin_website_lead_sms",
+        data={
+            "lead_id": 42,
+            "mode": "callback",
+            "name": "Taylor Smith",
+            "phone": "+18135550199",
+            "zip": "33609",
+            "service": "Weekly pool service",
+        },
+        public_base_url="https://example.com",
+    )
+    assert "New website lead #42" in rendered.text
+    assert "+18135550199" in rendered.text
+    assert "Callback" in rendered.text
+
+
+def test_website_lead_email_escapes_customer_content() -> None:
+    rendered = render_message(
+        template_key="admin_website_lead_email",
+        data={
+            "lead_id": 42,
+            "mode": "schedule",
+            "name": "<script>alert(1)</script>",
+            "phone": "+18135550199",
+            "zip": "33609",
+            "service": "Equipment service",
+            "notes": "Pump <b>noise</b>",
+            "sms_consent": True,
+        },
+        public_base_url="https://example.com",
+    )
+    assert rendered.subject and "New Tampa VIP website lead" in rendered.subject
+    assert rendered.html and "&lt;script&gt;" in rendered.html
+    assert "<script>" not in rendered.html
+    assert "Pump &lt;b&gt;noise&lt;/b&gt;" in rendered.html

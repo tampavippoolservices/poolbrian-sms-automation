@@ -45,6 +45,12 @@ services:
         sync: false
       - key: TWILIO_PHONE_NUMBER
         sync: false
+      - key: WEBSITE_LEAD_WEBHOOK_SECRET
+        sync: false
+      - key: WEBSITE_LEAD_SMS_DESTINATION
+        sync: false
+      - key: WEBSITE_LEAD_EMAIL_DESTINATION
+        sync: false
       - key: COMPANY_PHONE_NUMBER
         sync: false
       - key: ALERT_PHONE_NUMBER

@@ -4,7 +4,11 @@ import hmac
 from flask import Flask
 from twilio.request_validator import RequestValidator
 
-from app.security import valid_poolbrain_webhook, valid_twilio_request
+from app.security import (
+    valid_poolbrain_webhook,
+    valid_twilio_request,
+    valid_website_lead_webhook,
+)
 
 
 def test_poolbrain_hmac_uses_raw_request_body(monkeypatch) -> None:
@@ -38,3 +42,19 @@ def test_twilio_signature_includes_query_string(monkeypatch) -> None:
         headers={"X-Twilio-Signature": signature},
     ):
         assert valid_twilio_request()
+
+
+def test_website_lead_hmac_uses_raw_request_body(monkeypatch) -> None:
+    app = Flask(__name__)
+    body = b'{"event":"website.lead.created","id":"site-lead-42"}'
+    secret = "website-lead-secret"
+    signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    monkeypatch.setenv("WEBSITE_LEAD_WEBHOOK_SECRET", secret)
+    with app.test_request_context(
+        "/webhooks/website-lead",
+        method="POST",
+        data=body,
+        content_type="application/json",
+        headers={"X-Tampa-VIP-Signature": signature},
+    ):
+        assert valid_website_lead_webhook()

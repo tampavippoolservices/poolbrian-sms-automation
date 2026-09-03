@@ -109,6 +109,8 @@ package. Configure the `main` branch so both CI jobs must pass before Render dep
 ## Provider endpoints
 
 - PoolBrain: `POST /webhooks/poolbrain`
+- Tampa VIP website leads: `POST /webhooks/website-lead` with an
+  `X-Tampa-VIP-Signature` SHA-256 HMAC of the raw JSON body
 - Twilio incoming messages: `POST /webhooks/twilio/inbound`
 - Twilio status callback: generated per message as
   `/webhooks/twilio/status?job_id=<internal-id>`

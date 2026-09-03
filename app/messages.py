@@ -102,4 +102,58 @@ def render_message(
                 f"{data.get('message_body') or ''}"
             )
         )
+    if template_key == "admin_website_lead_sms":
+        mode = "Consultation" if data.get("mode") == "schedule" else "Callback"
+        return RenderedMessage(
+            text=(
+                f"New website lead #{data.get('lead_id')}: {data.get('name')} | "
+                f"{data.get('phone')} | ZIP {data.get('zip')} | {data.get('service')} | {mode}."
+            )
+        )
+    if template_key == "admin_website_lead_email":
+        mode = "Consultation request" if data.get("mode") == "schedule" else "Callback request"
+        values = {
+            "name": str(data.get("name") or "Not provided"),
+            "phone": str(data.get("phone") or "Not provided"),
+            "zip": str(data.get("zip") or "Not provided"),
+            "service": str(data.get("service") or "Not provided"),
+            "preferred_date": str(data.get("preferred_date") or "Not provided"),
+            "preferred_time": str(data.get("preferred_time") or "Not provided"),
+            "notes": str(data.get("notes") or "None"),
+            "sms_consent": "Yes" if data.get("sms_consent") else "No",
+        }
+        subject = f"New Tampa VIP website lead: {values['name']} - {values['service']}"
+        text_body = (
+            f"New Tampa VIP website lead #{data.get('lead_id')}\n\n"
+            f"Request: {mode}\nName: {values['name']}\nPhone: {values['phone']}\n"
+            f"ZIP: {values['zip']}\nService: {values['service']}\n"
+            f"Preferred date: {values['preferred_date']}\n"
+            f"Preferred time: {values['preferred_time']}\n"
+            f"Customer agreed to request-related texts: {values['sms_consent']}\n\n"
+            f"Notes:\n{values['notes']}"
+        )
+        rows = "".join(
+            "<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>"
+            f"{escape(label)}</th>"
+            f"<td style='padding:8px;border-bottom:1px solid #ddd'>{escape(value)}</td></tr>"
+            for label, value in (
+                ("Request", mode),
+                ("Name", values["name"]),
+                ("Phone", values["phone"]),
+                ("ZIP", values["zip"]),
+                ("Service", values["service"]),
+                ("Preferred date", values["preferred_date"]),
+                ("Preferred time", values["preferred_time"]),
+                ("Text consent", values["sms_consent"]),
+                ("Notes", values["notes"]),
+            )
+        )
+        html_body = (
+            "<!doctype html><html><body style='font-family:Arial,sans-serif;color:#172033'>"
+            "<div style='max-width:680px;margin:0 auto;padding:24px'>"
+            f"<h1>New website lead #{data.get('lead_id')}</h1>"
+            f"<table style='border-collapse:collapse;width:100%'>{rows}</table>"
+            "<p style='margin-top:24px'>Tampa VIP Pool Services website</p></div></body></html>"
+        )
+        return RenderedMessage(text=text_body, subject=subject, html=html_body)
     raise ValueError(f"Unknown message template: {template_key}")
