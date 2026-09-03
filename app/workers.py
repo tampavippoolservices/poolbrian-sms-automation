@@ -176,10 +176,20 @@ def process_inbound_events(config: AppConfig, *, limit: int = 50) -> dict[str, i
     return result
 
 
-def process_due_messages(config: AppConfig, *, limit: int = 50) -> dict[str, int]:
-    name = "process_due_messages"
+def process_due_messages(
+    config: AppConfig,
+    *,
+    limit: int = 50,
+    allowed_message_kinds: list[str] | None = None,
+    heartbeat_name: str = "process_due_messages",
+) -> dict[str, int]:
+    name = heartbeat_name
     heartbeat_started(name)
-    allowed_kinds = _allowed_message_kinds(config)
+    allowed_kinds = (
+        _allowed_message_kinds(config)
+        if allowed_message_kinds is None
+        else allowed_message_kinds
+    )
     if not allowed_kinds:
         result = {
             "claimed": 0,
@@ -339,6 +349,15 @@ def process_due_messages(config: AppConfig, *, limit: int = 50) -> dict[str, int
     }
     heartbeat_succeeded(name, result)
     return result
+
+
+def process_website_lead_messages(config: AppConfig, *, limit: int = 50) -> dict[str, int]:
+    return process_due_messages(
+        config,
+        limit=limit,
+        allowed_message_kinds=_website_lead_message_kinds(config),
+        heartbeat_name="process_website_lead_messages",
+    )
 
 
 def sync_google_reviews(config: AppConfig) -> dict[str, int | str]:
@@ -557,7 +576,6 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
                 "water_level_low_sms",
                 "admin_customer_reply_sms",
                 "admin_delivery_failure_sms",
-                "admin_website_lead_sms",
             ]
         )
     if within_local_hours(now, config.BUSINESS_TIMEZONE, 9, 19):
@@ -569,6 +587,13 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
                     "saturday_review_email",
                 ]
             )
+    return kinds
+
+
+def _website_lead_message_kinds(config: AppConfig) -> list[str]:
+    kinds: list[str] = []
+    if within_local_hours(utc_now(), config.BUSINESS_TIMEZONE, 6, 19):
+        kinds.append("admin_website_lead_sms")
     if config.OUTLOOK_SEND_ENABLED:
         kinds.append("admin_website_lead_email")
     return kinds

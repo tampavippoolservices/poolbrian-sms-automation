@@ -130,6 +130,7 @@ python -m app.cli process-all
 python -m app.cli poll-completed-services
 python -m app.cli process-inbound-events
 python -m app.cli process-messages
+python -m app.cli process-website-leads
 python -m app.cli recover-stale-work
 python -m app.cli sync-google-reviews
 python -m app.cli sync-outlook-bounces

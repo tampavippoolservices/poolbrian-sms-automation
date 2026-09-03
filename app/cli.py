@@ -19,6 +19,7 @@ from app.workers import (
     process_all,
     process_due_messages,
     process_inbound_events,
+    process_website_lead_messages,
     recover_stale_work,
     sync_google_reviews,
     sync_outlook_bounces,
@@ -34,6 +35,7 @@ def parser() -> argparse.ArgumentParser:
     subcommands.add_parser("poll-completed-services")
     subcommands.add_parser("process-inbound-events")
     subcommands.add_parser("process-messages")
+    subcommands.add_parser("process-website-leads")
     subcommands.add_parser("recover-stale-work")
     subcommands.add_parser("sync-google-reviews")
     subcommands.add_parser("sync-outlook-bounces")
@@ -76,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
             result = process_inbound_events(config)
         elif args.command == "process-messages":
             result = process_due_messages(config)
+        elif args.command == "process-website-leads":
+            result = process_website_lead_messages(config)
         elif args.command == "recover-stale-work":
             result = recover_stale_work()
         elif args.command == "sync-google-reviews":
