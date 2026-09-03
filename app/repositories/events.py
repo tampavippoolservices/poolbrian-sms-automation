@@ -74,10 +74,22 @@ def claim_inbound_events(
                     FROM inbound_events
                     WHERE status IN ('queued', 'retry')
                       AND next_attempt_at <= NOW()
-                      AND (:provider IS NULL OR provider = :provider)
-                      AND (:excluded_provider IS NULL OR provider <> :excluded_provider)
-                      AND (:event_type IS NULL OR event_type = :event_type)
-                      AND (:external_id IS NULL OR external_id = :external_id)
+                  AND (
+                    CAST(:provider AS TEXT) IS NULL
+                    OR provider = CAST(:provider AS TEXT)
+                  )
+                  AND (
+                    CAST(:excluded_provider AS TEXT) IS NULL
+                    OR provider <> CAST(:excluded_provider AS TEXT)
+                  )
+                  AND (
+                    CAST(:event_type AS TEXT) IS NULL
+                    OR event_type = CAST(:event_type AS TEXT)
+                  )
+                  AND (
+                    CAST(:external_id AS TEXT) IS NULL
+                    OR external_id = CAST(:external_id AS TEXT)
+                  )
                     ORDER BY next_attempt_at, id
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
