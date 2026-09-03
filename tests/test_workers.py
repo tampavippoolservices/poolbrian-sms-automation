@@ -109,3 +109,32 @@ def test_website_lead_worker_uses_dedicated_filter_and_heartbeat(monkeypatch) ->
         ],
         "heartbeat_name": "process_website_lead_messages",
     }
+
+
+def test_website_lead_event_worker_scopes_claim_to_one_event(monkeypatch) -> None:
+    config = cast(AppConfig, SimpleNamespace())
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        workers,
+        "_website_lead_message_kinds",
+        lambda _config: ["admin_website_lead_sms", "admin_website_lead_email"],
+    )
+
+    def fake_process(_config, **kwargs):
+        captured.update(kwargs)
+        return {"accepted": 2}
+
+    monkeypatch.setattr(workers, "process_due_messages", fake_process)
+
+    result = workers.process_website_lead_event(config, event_id="site-lead-42")
+
+    assert result == {"accepted": 2}
+    assert captured == {
+        "limit": 2,
+        "allowed_message_kinds": [
+            "admin_website_lead_sms",
+            "admin_website_lead_email",
+        ],
+        "idempotency_prefix": "website-lead:site-lead-42:",
+        "heartbeat_name": "dispatch_website_lead_event",
+    }
