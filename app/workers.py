@@ -38,7 +38,7 @@ from app.repositories.outcomes import set_processed_alert_outcome, set_processed
 from app.repositories.preferences import is_suppressed
 from app.repositories.state import baseline_completed_jobs, get_state
 from app.repositories.unsubscribe import get_or_create_unsubscribe_token
-from app.services.agreements import forward_customer_created
+from app.services.agreements import forward_customer_created, reconcile_agreement_drafts
 from app.services.google import GoogleBusinessClient
 from app.services.microsoft import MicrosoftApiError, MicrosoftGraphClient
 from app.services.poolbrain import PoolBrainClient, PoolBrainCreatePending
@@ -552,6 +552,7 @@ def process_all(config: AppConfig) -> dict[str, Any]:
     errors: dict[str, str] = {}
     steps = (
         ("recovery", recover_stale_work),
+        ("agreement_drafts", reconcile_agreement_drafts),
         ("completed_services", lambda: poll_completed_services(config)),
         ("inbound_events", lambda: process_inbound_events(config)),
         ("messages", lambda: process_due_messages(config)),
