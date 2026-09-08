@@ -38,6 +38,7 @@ from app.repositories.outcomes import set_processed_alert_outcome, set_processed
 from app.repositories.preferences import is_suppressed
 from app.repositories.state import baseline_completed_jobs, get_state
 from app.repositories.unsubscribe import get_or_create_unsubscribe_token
+from app.services.agreements import forward_customer_created
 from app.services.google import GoogleBusinessClient
 from app.services.microsoft import MicrosoftApiError, MicrosoftGraphClient
 from app.services.poolbrain import PoolBrainClient
@@ -461,6 +462,9 @@ def _process_poolbrain_event(
     config: AppConfig,
 ) -> None:
     payload = dict(event.get("payload") or {})
+    if payload.get("event") == "customer.created":
+        forward_customer_created(payload)
+        return
     if payload.get("event") != "alert.triggered":
         return
     outer = payload.get("data") or {}
