@@ -106,3 +106,17 @@ def test_worker_retries_relay_failure_and_continues_other_events(monkeypatch, co
     assert result == {"claimed": 2, "completed": 1, "failed": 1}
     assert fail.call_args.args[0] == 1
     assert complete.call_args.args[0] == 2
+
+
+def test_scheduled_reconciliation_uses_fixed_endpoint_and_fresh_signature(configured):
+    agreements.reconcile_agreement_drafts()
+    args, kwargs = configured.call_args
+    assert args[0].endswith("/api/poolbrain/reconcile")
+    assert json.loads(kwargs["data"])["event"] == "drafts.reconcile"
+    assert kwargs["allow_redirects"] is False
+
+
+def test_reconciliation_disabled_does_not_contact_app(configured, monkeypatch):
+    monkeypatch.delenv("AGREEMENTS_DRAFT_RELAY_ENABLED")
+    agreements.reconcile_agreement_drafts()
+    configured.assert_not_called()
