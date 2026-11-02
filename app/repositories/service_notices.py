@@ -10,6 +10,7 @@ from sqlalchemy.engine import Connection
 from app.db import transaction
 
 MAX_SERVICE_NOTICE_RECIPIENTS = 100
+SERVICE_NOTICE_CANDIDATE_PAGE_SIZE = 50
 
 
 def service_notice_candidates(search: str = "", limit: int = 100) -> list[dict[str, Any]]:
@@ -19,7 +20,39 @@ def service_notice_candidates(search: str = "", limit: int = 100) -> list[dict[s
             connection,
             search=normalized_search,
             limit=min(max(limit, 1), MAX_SERVICE_NOTICE_RECIPIENTS),
+            offset=0,
         )
+
+
+def service_notice_candidate_page(
+    search: str = "",
+    *,
+    page: int = 1,
+    page_size: int = SERVICE_NOTICE_CANDIDATE_PAGE_SIZE,
+) -> dict[str, Any]:
+    """Return one searchable page without weakening the per-campaign send limit."""
+    normalized_search = search.strip()[:100]
+    safe_page_size = min(max(page_size, 1), 100)
+    with transaction() as connection:
+        total = _candidate_count(connection, search=normalized_search)
+        pages = max(1, (total + safe_page_size - 1) // safe_page_size)
+        current_page = min(max(page, 1), pages)
+        items = _candidate_rows(
+            connection,
+            search=normalized_search,
+            limit=safe_page_size,
+            offset=(current_page - 1) * safe_page_size,
+        )
+    return {
+        "items": items,
+        "page": current_page,
+        "pages": pages,
+        "page_size": safe_page_size,
+        "total": total,
+        "first_item": (current_page - 1) * safe_page_size + 1 if total else 0,
+        "last_item": min(current_page * safe_page_size, total),
+        "search": normalized_search,
+    }
 
 
 def eligible_service_notice_recipients(customer_ids: list[int]) -> list[dict[str, Any]]:
@@ -208,6 +241,7 @@ def _candidate_rows(
     *,
     search: str,
     limit: int,
+    offset: int,
 ) -> list[dict[str, Any]]:
     rows = connection.execute(
         text(
@@ -234,12 +268,48 @@ def _candidate_rows(
                   OR CAST(latest.customer_id AS TEXT) ILIKE :pattern
               )
             ORDER BY latest.customer_name NULLS LAST, latest.customer_id
-            LIMIT :limit
+            LIMIT :limit OFFSET :offset
             """
         ),
-        {"search": search, "pattern": f"%{search}%", "limit": limit},
+        {
+            "search": search,
+            "pattern": f"%{search}%",
+            "limit": limit,
+            "offset": offset,
+        },
     ).mappings()
     return [dict(row) for row in rows]
+
+
+def _candidate_count(connection: Connection, *, search: str) -> int:
+    return int(
+        connection.execute(
+            text(
+                """
+                WITH latest AS (
+                    SELECT DISTINCT ON (customer_id)
+                           customer_id, customer_name, phone_e164, created_at
+                    FROM review_campaigns
+                    WHERE phone_e164 IS NOT NULL
+                    ORDER BY customer_id, created_at DESC, id DESC
+                )
+                SELECT COUNT(*)
+                FROM latest
+                LEFT JOIN communication_preferences AS preference
+                  ON preference.channel = 'sms'
+                 AND preference.destination_normalized = latest.phone_e164
+                WHERE COALESCE(preference.suppressed, FALSE) = FALSE
+                  AND (
+                      :search = ''
+                      OR COALESCE(latest.customer_name, '') ILIKE :pattern
+                      OR latest.phone_e164 ILIKE :pattern
+                      OR CAST(latest.customer_id AS TEXT) ILIKE :pattern
+                  )
+                """
+            ),
+            {"search": search, "pattern": f"%{search}%"},
+        ).scalar_one()
+    )
 
 
 def _recipient_rows(connection: Connection, customer_ids: list[int]) -> list[dict[str, Any]]:
