@@ -23,6 +23,10 @@ privacy retention, automated tests, and infrastructure as code.
    unsubscribe suppresses review email only.
 9. A confirmed or uniquely matched Google review cancels all pending reminders and prevents later
    review requests for that customer.
+10. Administrators can create controlled operational service-notice SMS campaigns from
+    `/admin/service-notices`. This requires a documented consent basis, exact recipient preview,
+    final confirmation, automatic suppression checks, Tampa VIP identification, and STOP
+    instructions. Promotional offers and advertising are intentionally out of scope.
 
 Clicks alone do not stop reminders because opening the Google page does not prove that a review was
 submitted. Google matching is deliberately conservative: exact unique matches may be automated;

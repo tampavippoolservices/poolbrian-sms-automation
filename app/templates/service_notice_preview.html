@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Service Notice | Tampa VIP Pool Services{% endblock %}
+
+{% block body %}
+<header class="brand-header">
+  <div class="brand-header__inner">
+    <div class="brand-lockup">
+      <div class="brand-logo-frame"><img class="brand-logo" src="{{ url_for('static', filename='images/tampa-vip-logo.jpeg') }}" alt="Tampa VIP Pool Services"></div>
+      <div><p class="brand-kicker">Tampa VIP Pool Services</p><h1 class="brand-title">Confirm Service Notice</h1><p class="brand-subtitle">Nothing has been queued yet</p></div>
+    </div>
+  </div>
+</header>
+
+<main class="dashboard-shell confirmation-shell" id="main-content">
+  <div class="dashboard-intro"><div><p class="eyebrow">Final verification</p><h2>Review before queuing</h2><p>Confirm the exact message, consent record, and recipients below.</p></div></div>
+
+  {% if excluded_count %}<p class="notice" role="alert">{{ excluded_count }} selected customer(s) became ineligible or had duplicate/suppressed numbers and will not receive this notice.</p>{% endif %}
+
+  <div class="preview-grid">
+    <section class="preview-card" aria-labelledby="message-preview-heading">
+      <h2 id="message-preview-heading">Customer message</h2>
+      <pre class="sms-preview">{{ preview_text }}</pre>
+      <p class="message-metrics">{{ preview_character_count }} characters · approximately {{ preview_segment_count }} SMS segment{% if preview_segment_count != 1 %}s{% endif %} per recipient</p>
+    </section>
+    <section class="preview-card" aria-labelledby="consent-preview-heading">
+      <h2 id="consent-preview-heading">Campaign record</h2>
+      <dl class="detail-list">
+        <dt>Name</dt><dd>{{ form.name }}</dd>
+        <dt>Consent basis</dt><dd>{{ consent_label }}</dd>
+        <dt>Evidence</dt><dd>{{ form.consent_evidence }}</dd>
+        <dt>Eligible recipients</dt><dd>{{ recipients|length }}</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="section-block" aria-labelledby="preview-recipients-heading">
+    <div class="section-heading"><div><h2 id="preview-recipients-heading">Recipients</h2><p>Suppression is checked again when you confirm and when the worker claims each message.</p></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>PoolBrain ID</th></tr></thead><tbody>
+    {% for recipient in recipients %}<tr><td>{{ recipient.customer_name }}</td><td>{{ recipient.phone_masked }}</td><td>{{ recipient.customer_id }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <form class="confirmation-form" method="post" action="/admin/service-notices/send">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="name" value="{{ form.name }}">
+    <input type="hidden" name="message_body" value="{{ form.message_body }}">
+    <input type="hidden" name="consent_basis" value="{{ form.consent_basis }}">
+    <input type="hidden" name="consent_evidence" value="{{ form.consent_evidence }}">
+    {% for recipient in recipients %}<input type="hidden" name="customer_ids" value="{{ recipient.customer_id }}">{% endfor %}
+    <label class="confirmation-check"><input type="checkbox" name="confirm" value="yes" required> I confirm this is a necessary operational/service notice, the selected customers consented to this category of text, and the message contains no promotion or advertising.</label>
+    <div class="toolbar"><button class="button--large" type="submit">Queue {{ recipients|length }} message(s)</button><a class="button button--secondary" href="/admin/service-notices">Cancel and return</a></div>
+  </form>
+</main>
+<footer class="site-footer">Tampa VIP Pool Services · Internal operations dashboard</footer>
+{% endblock %}

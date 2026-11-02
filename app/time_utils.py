@@ -38,3 +38,18 @@ def first_saturday_after(
 def within_local_hours(now: datetime, timezone_name: str, start_hour: int, end_hour: int) -> bool:
     local_hour = now.astimezone(ZoneInfo(timezone_name)).hour
     return start_hour <= local_hour < end_hour
+
+
+def next_service_notice_at(
+    starting_at: datetime,
+    *,
+    timezone_name: str,
+    start_hour: int = 9,
+    end_hour: int = 19,
+) -> datetime:
+    zone = ZoneInfo(timezone_name)
+    local = starting_at.astimezone(zone)
+    if start_hour <= local.hour < end_hour:
+        return starting_at
+    send_date = local.date() if local.hour < start_hour else local.date() + timedelta(days=1)
+    return datetime.combine(send_date, time(hour=start_hour), zone).astimezone(UTC)

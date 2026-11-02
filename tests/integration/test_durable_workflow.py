@@ -15,6 +15,11 @@ from app.repositories.jobs import (
     retry_dead_or_failed_job,
 )
 from app.repositories.preferences import is_suppressed, save_preference
+from app.repositories.service_notices import (
+    cancel_service_notice_campaign,
+    enqueue_service_notice_campaign,
+    service_notice_candidates,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -123,6 +128,79 @@ def test_suppression_is_audited_and_cancels_pending_jobs() -> None:
         ).scalar_one()
     assert set(statuses) == {"cancelled"}
     assert event_count == 1
+
+
+def test_service_notice_queues_only_eligible_unique_recipients() -> None:
+    common = {
+        "now": datetime(2026, 11, 2, 15, 0, tzinfo=UTC),
+        "timezone_name": "America/New_York",
+        "sms_delay_hours": 3,
+        "email_hour": 10,
+        "suppression_days": 120,
+        "max_attempts": 5,
+    }
+    create_completed_service_workflow(
+        source_job_id=9201,
+        customer_id=701,
+        customer_name="Eligible Customer",
+        phone_e164="+18135550101",
+        email_normalized=None,
+        **common,
+    )
+    create_completed_service_workflow(
+        source_job_id=9202,
+        customer_id=702,
+        customer_name="Stopped Customer",
+        phone_e164="+18135550102",
+        email_normalized=None,
+        **common,
+    )
+    save_preference("sms", "+18135550102", True, "customer_stop", "twilio")
+
+    candidates = service_notice_candidates()
+    assert [row["customer_id"] for row in candidates] == [701]
+
+    result = enqueue_service_notice_campaign(
+        name="Storm schedule",
+        message_body="Friday service will move to Saturday because of the storm.",
+        customer_ids=[701, 702],
+        consent_basis="poolbrain_service_agreement",
+        consent_evidence="Operational SMS authorization in the service agreement.",
+        scheduled_at=datetime(2026, 11, 2, 16, 0, tzinfo=UTC),
+        created_by="admin@example.com",
+        max_attempts=5,
+    )
+    assert result["recipient_count"] == 1
+    with transaction() as connection:
+        job = (
+            connection.execute(
+                text(
+                    """
+                    SELECT job.id, job.message_kind, job.destination_normalized, job.status
+                    FROM message_jobs AS job
+                    JOIN service_notice_recipients AS recipient
+                      ON recipient.message_job_id = job.id
+                    WHERE recipient.campaign_id = :campaign_id
+                    """
+                ),
+                {"campaign_id": result["campaign_id"]},
+            )
+            .mappings()
+            .one()
+        )
+    assert job["message_kind"] == "service_notice_sms"
+    assert job["destination_normalized"] == "+18135550101"
+    assert job["status"] == "queued"
+
+    cancelled = cancel_service_notice_campaign(int(result["campaign_id"]))
+    assert cancelled == {"cancelled_jobs": 1}
+    with transaction() as connection:
+        assert (
+            connection.execute(
+                text("SELECT status FROM message_jobs WHERE id = :job_id"), {"job_id": job["id"]}
+            ).scalar_one()
+            == "cancelled"
+        )
 
 
 def test_inbound_event_claim_is_atomic() -> None:

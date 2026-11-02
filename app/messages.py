@@ -40,6 +40,13 @@ def render_message(
                 "convenient. Tampa VIP Pool Services"
             )
         )
+    if template_key == "service_notice_sms":
+        message_body = str(data.get("message_body") or "").strip()
+        if not message_body:
+            raise ValueError("Service notice message is required")
+        return RenderedMessage(
+            text=(f"{message_body}\n\nTampa VIP Pool Services\nReply STOP to unsubscribe.")
+        )
     if template_key == "initial_review_sms":
         return RenderedMessage(
             text=(
