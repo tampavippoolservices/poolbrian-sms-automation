@@ -14,6 +14,22 @@ Check:
 An accepted Outlook message is not proof of delivery. Delivery is considered failed only after a
 permanent NDR. A Twilio `delivered` callback is the strongest SMS delivery state.
 
+## Operational service notices
+
+Use `/admin/service-notices` only for necessary updates related to an existing service
+relationship, such as weather delays, route changes, or temporary access instructions.
+
+1. Search for and individually select the affected customers.
+2. Keep the message operational; do not include offers, discounts, or advertising.
+3. Choose the actual consent basis and enter traceable evidence.
+4. Review the exact message, SMS segment estimate, and final recipient list.
+5. Confirm once. The durable worker sends during the 9 a.m.–7 p.m. Eastern window.
+6. Review accepted, pending, and problem counts on the same page.
+
+Suppressed recipients and duplicate phone numbers are removed automatically. The worker checks
+suppression again before provider submission. Use **Cancel unsent** to stop jobs that have not yet
+been claimed; already accepted messages cannot be recalled.
+
 ## Safe retry procedure
 
 The dashboard exposes retry only for `failed` and `dead` jobs. Before retrying:

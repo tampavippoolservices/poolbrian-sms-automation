@@ -32,9 +32,7 @@ def _app(monkeypatch):
 def test_outlook_connect_supports_top_level_get(monkeypatch) -> None:
     monkeypatch.setattr(microsoft_routes, "create_oauth_state", lambda *args: "state-1")
     monkeypatch.setattr(microsoft_routes, "MicrosoftGraphClient", _OAuthClient)
-    response = _app(monkeypatch).test_client().get(
-        "/microsoft/connect", headers=_basic_auth()
-    )
+    response = _app(monkeypatch).test_client().get("/microsoft/connect", headers=_basic_auth())
     assert response.status_code == 302
     assert response.location == "https://login.example.test/authorize?state=state-1"
 

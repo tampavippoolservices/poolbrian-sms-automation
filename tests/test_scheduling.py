@@ -1,7 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
 from app.domain.reviews import name_match_score, review_message_schedule
-from app.time_utils import first_saturday_after, next_day_email_at, within_local_hours
+from app.time_utils import (
+    first_saturday_after,
+    next_day_email_at,
+    next_service_notice_at,
+    within_local_hours,
+)
 
 
 def test_next_day_email_uses_business_timezone_across_dst() -> None:
@@ -47,3 +52,14 @@ def test_processing_window_is_end_exclusive() -> None:
     assert not within_local_hours(
         datetime(2026, 8, 20, 23, 0, tzinfo=UTC), "America/New_York", 6, 19
     )
+
+
+def test_service_notice_waits_until_next_business_window() -> None:
+    evening = datetime(2026, 11, 3, 1, 30, tzinfo=UTC)
+    assert next_service_notice_at(
+        evening,
+        timezone_name="America/New_York",
+    ) == datetime(2026, 11, 3, 14, 0, tzinfo=UTC)
+
+    daytime = datetime(2026, 11, 3, 16, 0, tzinfo=UTC)
+    assert next_service_notice_at(daytime, timezone_name="America/New_York") == daytime

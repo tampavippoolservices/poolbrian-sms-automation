@@ -674,7 +674,7 @@ def _allowed_message_kinds(config: AppConfig) -> list[str]:
             ]
         )
     if within_local_hours(now, config.BUSINESS_TIMEZONE, 9, 19):
-        kinds.append("initial_review_sms")
+        kinds.extend(["initial_review_sms", "service_notice_sms"])
         if config.OUTLOOK_SEND_ENABLED:
             kinds.extend(
                 [

@@ -32,6 +32,8 @@ def clean_database(migrated_database) -> None:
                 """
                 TRUNCATE TABLE
                     audit_events,
+                    service_notice_recipients,
+                    service_notice_campaigns,
                     communication_preference_events,
                     communication_preferences,
                     google_reviews,

@@ -13,6 +13,16 @@ def test_sms_review_link_is_on_separate_line() -> None:
     assert "STOP" in rendered.text
 
 
+def test_service_notice_adds_required_sender_and_opt_out_footer() -> None:
+    rendered = render_message(
+        template_key="service_notice_sms",
+        data={"message_body": "Friday service will move to Saturday because of the storm."},
+        public_base_url="https://example.com",
+    )
+    assert rendered.text.startswith("Friday service will move to Saturday")
+    assert rendered.text.endswith("Tampa VIP Pool Services\nReply STOP to unsubscribe.")
+
+
 def test_email_has_plain_html_and_unsubscribe_versions() -> None:
     rendered = render_message(
         template_key="next_day_review_email",

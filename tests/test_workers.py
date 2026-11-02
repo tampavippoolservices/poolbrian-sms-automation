@@ -48,6 +48,7 @@ def test_general_worker_excludes_website_leads(monkeypatch) -> None:
     enabled_kinds = workers._allowed_message_kinds(cast(AppConfig, enabled))
 
     assert "initial_review_sms" in disabled_kinds
+    assert "service_notice_sms" in disabled_kinds
     assert "next_day_review_email" not in disabled_kinds
     assert "saturday_review_email" not in disabled_kinds
     assert "next_day_review_email" in enabled_kinds

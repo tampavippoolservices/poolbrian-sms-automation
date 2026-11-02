@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Service Notices | Tampa VIP Pool Services{% endblock %}
+
+{% block body %}
+<header class="brand-header">
+  <div class="brand-header__inner">
+    <div class="brand-lockup">
+      <div class="brand-logo-frame">
+        <img class="brand-logo" src="{{ url_for('static', filename='images/tampa-vip-logo.jpeg') }}" alt="Tampa VIP Pool Services">
+      </div>
+      <div>
+        <p class="brand-kicker">Tampa VIP Pool Services</p>
+        <h1 class="brand-title">Operational Service Notices</h1>
+        <p class="brand-subtitle">Controlled customer SMS communication</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="button button--secondary" href="/admin/dashboard">Back to dashboard</a>
+    </div>
+  </div>
+</header>
+
+<main class="dashboard-shell" id="main-content">
+  {% if queued_campaign_id %}
+  <p class="success-notice" role="status">Campaign {{ queued_campaign_id }} was queued successfully. Delivery will occur during the approved 9 a.m.–7 p.m. Eastern window.</p>
+  {% endif %}
+
+  <div class="dashboard-intro">
+    <div>
+      <p class="eyebrow">Customer communication</p>
+      <h2>Create a service notice</h2>
+      <p>Use this only for necessary operational updates related to an existing Tampa VIP service relationship. Offers, discounts, and advertising require a separate promotional-consent workflow.</p>
+    </div>
+  </div>
+
+  <p class="notice" role="note"><span aria-hidden="true">!</span> Suppressed numbers are excluded automatically. You must still confirm and document the consent basis for the selected customers.</p>
+
+  <form class="table-search customer-search" method="get" action="/admin/service-notices" role="search">
+    <label for="customer-search">Search eligible customers</label>
+    <div class="table-search__fields">
+      <input id="customer-search" type="search" name="q" value="{{ search }}" maxlength="100" placeholder="Name, ID, or phone…">
+      <button type="submit">Search</button>
+      {% if search %}<a class="button button--secondary" href="/admin/service-notices">Clear</a>{% endif %}
+    </div>
+  </form>
+
+  <form class="notice-composer" method="post" action="/admin/service-notices/preview">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <label>
+        <span>Internal campaign name</span>
+        <input name="name" maxlength="100" required placeholder="Example: Hurricane schedule update">
+      </label>
+      <label>
+        <span>Consent basis</span>
+        <select name="consent_basis" required>
+          <option value="">Select the recorded basis</option>
+          {% for value, label in consent_bases.items() %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="form-grid__full">
+        <span>Operational message</span>
+        <textarea name="message_body" maxlength="420" rows="5" required placeholder="Explain the service-related update clearly. Tampa VIP identification and STOP instructions are added automatically."></textarea>
+        <small>Maximum 420 characters before the required Tampa VIP and STOP footer.</small>
+      </label>
+      <label class="form-grid__full">
+        <span>Consent evidence</span>
+        <textarea name="consent_evidence" maxlength="500" rows="3" required placeholder="Example: PoolBrain service agreement signed by these customers; operational SMS authorization section."></textarea>
+      </label>
+    </div>
+
+    <section class="section-block" aria-labelledby="recipient-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="recipient-heading">Choose recipients</h2>
+          <p>Select up to {{ max_recipients }} customers currently known to the automation.</p>
+        </div>
+      </div>
+      <div class="table-wrap" role="region" aria-label="Eligible service notice customers" tabindex="0">
+        <table class="selection-table">
+          <thead><tr><th scope="col">Select</th><th scope="col">Customer</th><th scope="col">Phone</th><th scope="col">Consent signal</th></tr></thead>
+          <tbody>
+          {% for customer in candidates %}
+            <tr>
+              <td><input type="checkbox" name="customer_ids" value="{{ customer.customer_id }}" aria-label="Select {{ customer.customer_name or 'customer' }}"></td>
+              <td>{{ customer.customer_name or "Customer" }}<br><small class="text-muted">PoolBrain ID {{ customer.customer_id }}</small></td>
+              <td>{{ customer.phone_masked }}</td>
+              <td>{% if customer.preference_source %}Opt-in/preference recorded: {{ customer.preference_source }}{% else %}<span class="text-warning">Confirm documented consent</span>{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td class="empty-state" colspan="4">No eligible customers match this search.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button class="button--large composer-submit" type="submit">Preview selected notice</button>
+    </section>
+  </form>
+
+  <section class="section-block" aria-labelledby="recent-notices-heading">
+    <div class="section-heading"><div><h2 id="recent-notices-heading">Recent service notices</h2><p>Audited campaign and delivery status.</p></div></div>
+    <div class="table-wrap" role="region" aria-label="Recent service notices" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Campaign</th><th scope="col">Created</th><th scope="col">Scheduled</th><th scope="col">Recipients</th><th scope="col">Accepted</th><th scope="col">Pending</th><th scope="col">Problems</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+        {% for campaign in recent_campaigns %}
+          <tr>
+            <td>{{ campaign.name }}<br><small class="text-muted">#{{ campaign.id }} · {{ campaign.created_by }}</small></td>
+            <td>{{ format_time(campaign.created_at) }}</td>
+            <td>{{ format_time(campaign.scheduled_at) }}</td>
+            <td>{{ campaign.recipient_count }}</td>
+            <td>{{ campaign.accepted_count }}</td>
+            <td>{{ campaign.pending_count }}</td>
+            <td>{{ campaign.failed_count }}</td>
+            <td>
+              {% if campaign.status == "queued" and campaign.pending_count %}
+              <form class="table-form" method="post" action="/admin/service-notices/{{ campaign.id }}/cancel">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="danger" type="submit">Cancel unsent</button>
+              </form>
+              {% else %}<span class="status-badge status-badge--{{ campaign.display_status }}">{{ campaign.display_status }}</span>{% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td class="empty-state" colspan="8">No service notice campaigns have been created.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">Tampa VIP Pool Services · Internal operations dashboard</footer>
+{% endblock %}
