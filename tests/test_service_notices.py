@@ -27,16 +27,25 @@ def _app(monkeypatch):
 def test_service_notice_page_lists_only_repository_candidates(monkeypatch) -> None:
     monkeypatch.setattr(
         admin_routes,
-        "service_notice_candidates",
-        lambda _search: [
-            {
-                "customer_id": 701,
-                "customer_name": "Eligible Customer",
-                "phone_e164": "+18135550101",
-                "preference_source": "twilio",
-                "preference_reason": "customer_opt_in",
-            }
-        ],
+        "service_notice_candidate_page",
+        lambda _search, page: {
+            "items": [
+                {
+                    "customer_id": 701,
+                    "customer_name": "Eligible Customer",
+                    "phone_e164": "+18135550101",
+                    "preference_source": "twilio",
+                    "preference_reason": "customer_opt_in",
+                }
+            ],
+            "page": page,
+            "pages": 3,
+            "page_size": 50,
+            "total": 125,
+            "first_item": 1,
+            "last_item": 50,
+            "search": _search,
+        },
     )
     monkeypatch.setattr(admin_routes, "recent_service_notice_campaigns", lambda: [])
 
@@ -47,6 +56,51 @@ def test_service_notice_page_lists_only_repository_candidates(monkeypatch) -> No
     assert b"***-***-0101" in response.data
     assert b"Operational Service Notices" in response.data
     assert b"Preview selected notice" in response.data
+    assert b"Showing 1\xe2\x80\x9350 of 125 eligible customers" in response.data
+    assert b"Page 1 of 3" in response.data
+    assert b"service-notices.js" in response.data
+
+
+def test_service_notice_candidate_data_is_paginated_and_masks_phone(monkeypatch) -> None:
+    monkeypatch.setattr(
+        admin_routes,
+        "service_notice_candidate_page",
+        lambda search, page: {
+            "items": [
+                {
+                    "customer_id": 801,
+                    "customer_name": "Search Result",
+                    "phone_e164": "+18135550199",
+                    "preference_source": None,
+                    "preference_reason": None,
+                }
+            ],
+            "page": page,
+            "pages": 4,
+            "page_size": 50,
+            "total": 151,
+            "first_item": 51,
+            "last_item": 100,
+            "search": search,
+        },
+    )
+
+    response = (
+        _app(monkeypatch)
+        .test_client()
+        .get(
+            "/admin/service-notices/candidates?q=Search&page=2",
+            headers=_basic_auth(),
+        )
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["page"] == 2
+    assert payload["total"] == 151
+    assert payload["search"] == "Search"
+    assert payload["items"][0]["phone_masked"] == "***-***-0199"
+    assert "phone_e164" not in payload["items"][0]
 
 
 def test_preview_does_not_enqueue_messages(monkeypatch) -> None:

@@ -6,7 +6,7 @@ from typing import TypedDict
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, abort, current_app, redirect, render_template, request
+from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request
 
 from app.domain.contact import masked_destination
 from app.domain.sms import sms_segment_count
@@ -21,7 +21,7 @@ from app.repositories.service_notices import (
     eligible_service_notice_recipients,
     enqueue_service_notice_campaign,
     recent_service_notice_campaigns,
-    service_notice_candidates,
+    service_notice_candidate_page,
 )
 from app.security import admin_identity, csrf_token, require_admin, validate_csrf
 from app.time_utils import next_service_notice_at, utc_now
@@ -135,6 +135,15 @@ def _dashboard_page_url(
     return f"/admin/dashboard?{urlencode(query)}#{anchor}"
 
 
+def _service_notice_page_url(search: str, page: int) -> str:
+    return f"/admin/service-notices?{urlencode({'q': search, 'page': page})}#recipient-heading"
+
+
+def _mask_service_notice_candidate_phones(candidates: list[dict]) -> None:
+    for candidate in candidates:
+        candidate["phone_masked"] = masked_destination(candidate.pop("phone_e164", None))
+
+
 @admin_bp.post("/campaigns/<int:campaign_id>/confirm")
 @require_admin
 def confirm(campaign_id: int):
@@ -186,12 +195,26 @@ def retry_job(job_id: int):
 @require_admin
 def service_notices():
     search = _search_argument("q")
-    candidates = service_notice_candidates(search)
-    for candidate in candidates:
-        candidate["phone_masked"] = masked_destination(candidate.pop("phone_e164", None))
+    candidate_page = service_notice_candidate_page(
+        search,
+        page=_page_argument("page"),
+    )
+    _mask_service_notice_candidate_phones(candidate_page["items"])
+    page = int(candidate_page["page"])
+    pages = int(candidate_page["pages"])
+    candidate_page.update(
+        {
+            "first_url": _service_notice_page_url(search, 1),
+            "previous_url": _service_notice_page_url(search, page - 1) if page > 1 else None,
+            "next_url": _service_notice_page_url(search, page + 1) if page < pages else None,
+            "last_url": _service_notice_page_url(search, pages),
+            "clear_url": _service_notice_page_url("", 1),
+        }
+    )
     return render_template(
         "service_notices.html",
-        candidates=candidates,
+        candidates=candidate_page["items"],
+        candidate_pagination=candidate_page,
         recent_campaigns=recent_service_notice_campaigns(),
         search=search,
         queued_campaign_id=request.args.get("queued", ""),
@@ -202,6 +225,17 @@ def service_notices():
         auth_mode=current_app.config["ADMIN_AUTH_MODE"],
         format_time=lambda value: _format_time(value, str(current_app.config["BUSINESS_TIMEZONE"])),
     )
+
+
+@admin_bp.get("/service-notices/candidates")
+@require_admin
+def service_notice_candidate_data():
+    candidate_page = service_notice_candidate_page(
+        _search_argument("q"),
+        page=_page_argument("page"),
+    )
+    _mask_service_notice_candidate_phones(candidate_page["items"])
+    return jsonify(candidate_page)
 
 
 @admin_bp.post("/service-notices/preview")

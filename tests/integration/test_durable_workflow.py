@@ -18,6 +18,7 @@ from app.repositories.preferences import is_suppressed, save_preference
 from app.repositories.service_notices import (
     cancel_service_notice_campaign,
     enqueue_service_notice_campaign,
+    service_notice_candidate_page,
     service_notice_candidates,
 )
 
@@ -155,10 +156,24 @@ def test_service_notice_queues_only_eligible_unique_recipients() -> None:
         email_normalized=None,
         **common,
     )
+    create_completed_service_workflow(
+        source_job_id=9203,
+        customer_id=703,
+        customer_name="Second Eligible Customer",
+        phone_e164="+18135550103",
+        email_normalized=None,
+        **common,
+    )
     save_preference("sms", "+18135550102", True, "customer_stop", "twilio")
 
     candidates = service_notice_candidates()
-    assert [row["customer_id"] for row in candidates] == [701]
+    assert [row["customer_id"] for row in candidates] == [701, 703]
+    first_page = service_notice_candidate_page(page=1, page_size=1)
+    second_page = service_notice_candidate_page(page=2, page_size=1)
+    assert first_page["total"] == 2
+    assert first_page["pages"] == 2
+    assert [row["customer_id"] for row in first_page["items"]] == [701]
+    assert [row["customer_id"] for row in second_page["items"]] == [703]
 
     result = enqueue_service_notice_campaign(
         name="Storm schedule",

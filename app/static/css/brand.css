@@ -418,6 +418,29 @@ button.danger:hover { background: #8f1d15; }
   white-space: nowrap;
 }
 
+.recipient-selection-count {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #b8cce0;
+  border-radius: 999px;
+  color: var(--brand-navy-800);
+  background: var(--brand-blue-50);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.candidate-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-blue-700);
+}
+
+.candidate-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--line);
